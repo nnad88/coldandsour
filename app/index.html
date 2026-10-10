@@ -1,0 +1,1327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Cold and Sour</title>
+<meta name="description" content="Photograph the menu, swipe the dishes, eat what you both said yes to.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#FF5864">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cold & Sour">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --red:#FF4458; --red-d:#E02E45;
+  --green:#16D29C; --green-d:#0FB184;
+  --ink:#16141A; --mut:#6A6670; --faint:#A5A1AC; --hair:#F0EEF2;
+  --mono:"DM Mono",ui-monospace,Menlo,monospace;
+  --sans:"Poppins",system-ui,-apple-system,sans-serif;
+  --pad: env(safe-area-inset-bottom, 0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  margin:0; font-family:var(--sans); color:#fff;
+  background:linear-gradient(168deg,#FF5864 0%,#FF7854 52%,#FD267D 100%);
+  background-attachment:fixed;
+  -webkit-font-smoothing:antialiased; overscroll-behavior:none;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,textarea{font-family:inherit;font-size:16px}
+.scr{display:none;min-height:100%;flex-direction:column;
+  padding:calc(env(safe-area-inset-top,0px) + 18px) 18px calc(var(--pad) + 16px)}
+.scr.on{display:flex}
+
+/* ---------- chrome ---------- */
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 4px 12px;flex:none}
+.brand{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#FFE4E0}
+.pill{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:#fff;
+  background:rgba(0,0,0,.22);padding:5px 11px;border-radius:999px;white-space:nowrap}
+.pill.tap{border:none}
+.foot{margin:13px 0 0;text-align:center;font-family:var(--mono);font-size:10px;
+  letter-spacing:.13em;text-transform:uppercase;color:rgba(255,255,255,.72);flex:none}
+
+/* ---------- buttons ---------- */
+.big{display:block;width:100%;background:#fff;color:var(--ink);border-radius:18px;
+  padding:19px 20px;font-size:17px;font-weight:700;letter-spacing:-.01em;
+  box-shadow:0 10px 26px rgba(120,10,40,.26)}
+.big:active{transform:translateY(1px)}
+.big[disabled]{opacity:.5}
+.ghost{display:block;width:100%;background:rgba(255,255,255,.16);color:#fff;border-radius:16px;
+  padding:15px 18px;font-size:14.5px;font-weight:600}
+.link{background:none;color:rgba(255,255,255,.82);font-size:13px;font-weight:600;
+  text-decoration:underline;text-underline-offset:3px;padding:8px}
+
+/* ---------- setup ---------- */
+.sheet{background:#fff;color:var(--ink);border-radius:20px;padding:20px;margin-bottom:12px}
+.sheet h3{margin:0 0 6px;font-size:16px;font-weight:700;letter-spacing:-.01em;display:flex;gap:9px;align-items:center}
+.sheet h3 i{flex:none;width:21px;height:21px;border-radius:999px;background:var(--ink);color:#fff;
+  font-style:normal;font-family:var(--mono);font-size:10px;display:grid;place-items:center}
+.sheet p{margin:0;font-size:13.5px;line-height:1.55;color:var(--mut);font-weight:500}
+.sheet p a{color:var(--red);font-weight:600}
+.sheet label{display:block;margin:12px 0 5px;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+.sheet input{width:100%;background:#F7F6F8;border:1.5px solid var(--hair);border-radius:11px;
+  padding:13px 14px;color:var(--ink);font-weight:500}
+.sheet input:focus{outline:none;border-color:var(--red)}
+.code{background:#16141A;color:#9BE8D0;border-radius:12px;padding:13px;margin-top:12px;
+  font-family:var(--mono);font-size:10.5px;line-height:1.5;max-height:130px;overflow:auto;white-space:pre}
+.mini{margin-top:10px;background:var(--ink);color:#fff;border-radius:10px;padding:11px 15px;
+  font-size:13px;font-weight:600}
+.who{display:flex;gap:9px;margin-top:4px}
+.who button{flex:1;background:#F7F6F8;border:2px solid var(--hair);border-radius:13px;padding:14px 8px;
+  font-size:15px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.warn{background:rgba(0,0,0,.26);border-radius:14px;padding:13px 15px;font-size:13px;
+  line-height:1.5;font-weight:500;margin-bottom:12px}
+.warn b{font-weight:700}
+
+/* ---------- home ---------- */
+.hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center;padding:10px 0}
+.hero h1{margin:0;font-size:44px;line-height:.92;font-weight:800;letter-spacing:-.035em;text-wrap:balance}
+.hero h1 em{font-style:normal;color:#FFE168}
+.hero p{margin:14px 0 0;font-size:14.5px;line-height:1.5;font-weight:500;color:rgba(255,255,255,.85);max-width:27ch}
+.shoot{margin-top:30px;width:116px;height:116px;border-radius:999px;background:#fff;
+  display:grid;place-items:center;box-shadow:0 14px 34px rgba(120,10,40,.32)}
+.shoot:active{transform:scale(.96)}
+.card-note{background:rgba(0,0,0,.24);border-radius:18px;padding:16px;margin-bottom:10px;text-align:left}
+.card-note .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#FFE168}
+.card-note h4{margin:7px 0 2px;font-size:17px;font-weight:700;letter-spacing:-.015em}
+.card-note p{margin:0 0 12px;font-size:13px;line-height:1.45;font-weight:500;color:rgba(255,255,255,.8)}
+
+/* ---------- cooking ---------- */
+.cook{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.cook h2{margin:0 0 7px;font-size:27px;font-weight:800;letter-spacing:-.025em}
+.cook .step{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:rgba(255,255,255,.85);min-height:19px}
+.bar{width:100%;max-width:300px;height:12px;border-radius:999px;background:rgba(0,0,0,.26);
+  margin:26px 0 12px;overflow:hidden;padding:3px}
+.bar i{display:block;height:100%;border-radius:999px;background:#fff;width:0%;transition:width .18s linear}
+.pct{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:rgba(255,255,255,.7)}
+.go{width:190px;height:190px;border-radius:999px;background:#fff;color:var(--ink);
+  font-size:56px;font-weight:800;letter-spacing:-.03em;box-shadow:0 16px 40px rgba(120,10,40,.34);
+  display:grid;place-items:center;animation:pop .45s cubic-bezier(.2,1.5,.4,1)}
+.go:active{transform:scale(.96)}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* ---------- deck ---------- */
+.deck{flex:1;position:relative;margin:2px 2px 0;min-height:340px}
+.swipe{position:absolute;left:0;right:0;top:0;bottom:30px;background:#fff;color:var(--ink);border-radius:24px;
+  box-shadow:0 18px 44px rgba(120,10,40,.34);padding:28px 24px 24px;display:flex;flex-direction:column;
+  overflow:hidden;touch-action:none;will-change:transform}
+.swipe .sec{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--red)}
+.swipe h2{margin:13px 0 0;font-size:36px;line-height:.98;font-weight:800;letter-spacing:-.03em;text-wrap:balance}
+.swipe h2.sm{font-size:28px}
+.swipe h2.xs{font-size:23px;line-height:1.06}
+.swipe .desc{margin:14px 0 0;font-size:14.5px;line-height:1.5;color:var(--mut);font-weight:500;
+  overflow:hidden;flex-shrink:1}
+.swipe .bot{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  border-top:1.5px solid var(--hair);padding-top:15px;margin-top:14px}
+.swipe .price{font-size:28px;font-weight:800;letter-spacing:-.02em}
+.swipe .of{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.stamp{position:absolute;top:34px;padding:4px 13px 7px;border-radius:10px;border:5px solid;
+  font-size:30px;font-weight:800;letter-spacing:.02em;opacity:0;pointer-events:none}
+.stamp.yes{left:22px;transform:rotate(-16deg);border-color:var(--green);color:var(--green)}
+.stamp.no{right:22px;transform:rotate(16deg);border-color:var(--red);color:var(--red)}
+.under{position:absolute;left:0;right:0;top:0;bottom:30px;background:#fff;border-radius:24px;opacity:.34}
+.acts{display:flex;align-items:center;justify-content:center;gap:22px;padding-top:18px;flex:none}
+.rnd{width:66px;height:66px;border-radius:999px;background:#fff;display:grid;place-items:center;
+  box-shadow:0 8px 20px rgba(120,10,40,.26)}
+.rnd:active{transform:scale(.92)}
+.rnd.sm{width:50px;height:50px;background:rgba(255,255,255,.28);box-shadow:none}
+
+/* ---------- results ---------- */
+.rhead{text-align:center;padding:14px 0 18px;flex:none}
+.rhead .n{font-size:68px;font-weight:800;letter-spacing:-.05em;line-height:.9}
+.rhead h2{margin:8px 0 0;font-size:20px;font-weight:700;letter-spacing:-.02em}
+.rhead p{margin:7px 0 0;font-size:13.5px;line-height:1.5;font-weight:500;color:rgba(255,255,255,.82)}
+.list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px}
+.hit{background:#fff;color:var(--ink);border-radius:17px;padding:16px 17px;margin-bottom:9px;
+  display:flex;gap:13px;align-items:flex-start}
+.hit .num{flex:none;width:26px;height:26px;border-radius:999px;background:var(--green);color:#fff;
+  font-family:var(--mono);font-size:11px;display:grid;place-items:center;margin-top:1px}
+.hit h4{margin:0;font-size:17px;line-height:1.2;font-weight:700;letter-spacing:-.018em}
+.hit p{margin:5px 0 0;font-size:12.5px;line-height:1.45;color:var(--mut);font-weight:500}
+.hit .pr{margin-left:auto;flex:none;font-size:15px;font-weight:700;padding-left:4px}
+.solo{background:rgba(0,0,0,.2);border-radius:14px;padding:12px 15px;margin-bottom:8px;
+  display:flex;gap:10px;align-items:baseline}
+.solo .w{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+  color:#FFE168;flex:none;width:58px;overflow:hidden;text-overflow:ellipsis}
+.solo span{font-size:13.5px;font-weight:600;line-height:1.3}
+.hr{margin:18px 4px 10px;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;
+  text-transform:uppercase;color:rgba(255,255,255,.6)}
+.toast{position:fixed;left:50%;bottom:calc(var(--pad) + 22px);transform:translateX(-50%);
+  background:var(--ink);color:#fff;padding:12px 18px;border-radius:999px;font-size:13.5px;
+  font-weight:600;z-index:60;max-width:88vw;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.hide{display:none !important}
+</style>
+</head>
+<body>
+
+<!-- ============================= SETUP ============================= -->
+<section class="scr" id="s-setup">
+  <div class="top"><span class="brand">cold &amp; sour</span><span class="pill">setup</span></div>
+
+  <div class="warn">
+    <b>Paste the pairing link here</b> if you already set up the other phone. Otherwise work through the five steps.
+    <input id="pairIn" placeholder="https://…/#p=…" autocomplete="off" autocapitalize="off" spellcheck="false"
+      style="width:100%;margin-top:10px;background:rgba(255,255,255,.14);border:1.5px solid rgba(255,255,255,.3);border-radius:11px;padding:12px;color:#fff;font-weight:500">
+    <button class="mini" id="pairGo" style="background:#fff;color:#16141A">Pair this phone</button>
+  </div>
+
+  <div class="sheet">
+    <h3><i>1</i> Create a Supabase project</h3>
+    <p>Free, no card. Go to <a href="https://supabase.com/dashboard" target="_blank" rel="noopener">supabase.com</a>,
+       hit <b>New project</b> — any name, any region. It takes about two minutes to build.</p>
+  </div>
+
+  <div class="sheet">
+    <h3><i>2</i> Paste this SQL and hit Run</h3>
+    <p>In Supabase: <b>SQL Editor → New query →</b> paste → <b>Run</b>.</p>
+    <div class="code" id="sqlBox">loading…</div>
+    <button class="mini" id="sqlCopy">Copy the SQL</button>
+  </div>
+
+  <div class="sheet">
+    <h3><i>3</i> Your two Supabase keys</h3>
+    <p><b>Project Settings → Data API</b> for the URL, then <b>Project Settings → API Keys</b> for the
+       <b>publishable key</b> (older projects call it <i>anon public</i>). Never the <i>secret</i> one.</p>
+    <label for="sbUrl">Project URL</label>
+    <input id="sbUrl" placeholder="https://abcdefgh.supabase.co" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <label for="sbKey">Publishable / anon key</label>
+    <input id="sbKey" placeholder="eyJhbGciOi…" autocomplete="off" autocapitalize="off" spellcheck="false">
+  </div>
+
+  <div class="sheet">
+    <h3><i>4</i> A Gemini key</h3>
+    <p>Free as well. Go to <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>,
+       hit <b>Create API key</b> and paste it here. This is the bit that reads the photo.</p>
+    <label for="gKey">Gemini API key</label>
+    <input id="gKey" placeholder="AIza…" autocomplete="off" autocapitalize="off" spellcheck="false">
+  </div>
+
+  <div class="sheet">
+    <h3><i>5</i> The two of you</h3>
+    <label for="nmA">Name</label>
+    <input id="nmA" placeholder="Dani" autocomplete="off" maxlength="14">
+    <label for="nmB">Name</label>
+    <input id="nmB" placeholder="Ana" autocomplete="off" maxlength="14">
+    <label>Who is holding this phone?</label>
+    <div class="who" id="whoPick">
+      <button type="button" data-i="0" aria-pressed="false">—</button>
+      <button type="button" data-i="1" aria-pressed="false">—</button>
+    </div>
+  </div>
+
+  <button class="big" id="setupGo">Start</button>
+  <p class="foot" id="setupErr"></p>
+</section>
+
+<!-- ============================= HOME ============================= -->
+<section class="scr" id="s-home">
+  <div class="top">
+    <span class="brand">cold &amp; sour</span>
+    <button class="pill tap" id="gearBtn">⚙ settings</button>
+  </div>
+
+  <div id="homeCards"></div>
+
+  <div class="hero">
+    <h1>What the <em>hell</em><br>do we order?</h1>
+    <p>Take a photo of the menu. I turn it into cards you can swipe.</p>
+    <button class="shoot" id="shootBtn" aria-label="Photograph the menu">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#16141A" stroke-width="1.9"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8a1 1 0 0 0 .83-.45l.74-1.1A1 1 0 0 1 9.7 4h4.6a1 1 0 0 1 .83.45l.74 1.1a1 1 0 0 0 .83.45h1.8A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"/>
+        <circle cx="12" cy="12.5" r="3.6"/>
+      </svg>
+    </button>
+    <input type="file" id="shootIn" accept="image/*" capture="environment" multiple class="hide">
+  </div>
+
+  <p class="foot" id="homeFoot">You are —</p>
+</section>
+
+<!-- ============================= COOKING ============================= -->
+<section class="scr" id="s-cook">
+  <div class="top"><span class="brand">cold &amp; sour</span><span class="pill" id="cookPill">reading</span></div>
+  <div class="cook">
+    <h2 id="cookTitle">Reading the menu</h2>
+    <div class="step" id="cookStep">…</div>
+    <div class="bar"><i id="cookBar"></i></div>
+    <div class="pct" id="cookPct">0%</div>
+    <div id="cookFail" class="hide" style="margin-top:24px;width:100%;max-width:310px">
+      <p style="font-size:14px;line-height:1.55;font-weight:500;color:rgba(255,255,255,.9)" id="cookMsg"></p>
+      <button class="big" id="cookRetry" style="margin-top:14px">Try again</button>
+      <button class="link" id="cookBack" style="margin:4px auto 0">Back</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= GO ============================= -->
+<section class="scr" id="s-go">
+  <div class="top"><span class="brand">cold &amp; sour</span><span class="pill" id="goPill">—</span></div>
+  <div class="cook">
+    <h2 id="goPlace" style="margin-bottom:4px">The menu is ready</h2>
+    <div class="step" id="goCount">—</div>
+    <div style="height:34px"></div>
+    <button class="go" id="goBtn">GO</button>
+    <div style="height:14px"></div>
+    <button class="link" id="goBack">Not now</button>
+  </div>
+</section>
+
+<!-- ============================= DECK ============================= -->
+<section class="scr" id="s-deck">
+  <div class="top">
+    <button class="pill tap" id="deckQuit">← quit</button>
+    <span class="pill" id="deckCount">0 / 0</span>
+  </div>
+  <div class="deck" id="deckBox"></div>
+  <div class="acts">
+    <button class="rnd" id="btnNo" aria-label="No thanks">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FF4458" stroke-width="3.2"
+           stroke-linecap="round" aria-hidden="true"><path d="M5 5 19 19M19 5 5 19"/></svg>
+    </button>
+    <button class="rnd sm" id="btnUndo" aria-label="Undo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12H4M10 6 4 12l6 6"/></svg>
+    </button>
+    <button class="rnd" id="btnYes" aria-label="Like">
+      <svg width="27" height="27" viewBox="0 0 24 24" fill="#16D29C" aria-hidden="true">
+        <path d="M12 21s-7.6-4.9-9.3-9.2C1.2 8 3.3 4.6 6.9 4.6c2 0 3.6 1.1 5.1 3.1 1.5-2 3.1-3.1 5.1-3.1 3.6 0 5.7 3.4 4.2 7.2C19.6 16.1 12 21 12 21z"/>
+      </svg>
+    </button>
+  </div>
+  <p class="foot" id="deckFoot">—</p>
+</section>
+
+<!-- ============================= WAITING ============================= -->
+<section class="scr" id="s-wait">
+  <div class="top"><span class="brand">cold &amp; sour</span><span class="pill" id="waitPill">—</span></div>
+  <div class="cook">
+    <h2 id="waitTitle">Done</h2>
+    <div class="step" id="waitStep">—</div>
+    <div class="bar"><i id="waitBar"></i></div>
+    <div class="pct" id="waitPct">—</div>
+    <div style="height:26px"></div>
+    <button class="ghost" id="waitPeek" style="max-width:300px">See what we have so far</button>
+    <div style="height:8px"></div>
+    <button class="link" id="waitBack">Back to the start</button>
+  </div>
+</section>
+
+<!-- ============================= RESULTS ============================= -->
+<section class="scr" id="s-res">
+  <div class="top">
+    <button class="pill tap" id="resHome">← home</button>
+    <span class="pill" id="resPill">—</span>
+  </div>
+  <div class="rhead">
+    <div class="n" id="resN">0</div>
+    <h2 id="resH">—</h2>
+    <p id="resP">—</p>
+  </div>
+  <div class="list" id="resList"></div>
+</section>
+
+<!-- ============================= SETTINGS ============================= -->
+<section class="scr" id="s-set">
+  <div class="top"><button class="pill tap" id="setBack">← back</button><span class="pill">settings</span></div>
+
+  <div class="sheet">
+    <h3>Pair the other phone</h3>
+    <p>Open this link on the other phone, or copy it and paste it into the box at the very top there.
+       The keys travel inside it, so nothing has to be set up twice.</p>
+    <div class="code" id="pairLink" style="white-space:pre-wrap;word-break:break-all">—</div>
+    <button class="mini" id="pairCopy">Copy the link</button>
+  </div>
+
+  <div class="sheet">
+    <h3>This phone</h3>
+    <label>Who is holding it?</label>
+    <div class="who" id="whoPick2">
+      <button type="button" data-i="0" aria-pressed="false">—</button>
+      <button type="button" data-i="1" aria-pressed="false">—</button>
+    </div>
+    <label for="gKey2">Gemini API key</label>
+    <input id="gKey2" placeholder="AIza…" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button class="mini" id="saveSet">Save</button>
+  </div>
+
+  <div class="sheet">
+    <h3>Start over</h3>
+    <p>Erases the keys on this phone. The rounds stay in Supabase, nothing is lost.</p>
+    <button class="mini" id="wipeBtn" style="background:#FF4458">Erase the setup</button>
+  </div>
+  <div style="height:20px"></div>
+</section>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   config — the keys live on these two phones, never in the repo
+   ============================================================ */
+var CFG_KEY = "cas.cfg";
+var cfg = null;
+// ?demo=1 runs the whole app against a fake backend on this device only, so you can
+// try the swiping before setting anything up. The other person votes at random.
+var DEMO = /[?&]demo=/.test(location.search);
+
+function loadCfg(){
+  try { var v = JSON.parse(localStorage.getItem(CFG_KEY) || "null");
+        return (v && v.url && v.key && v.pair) ? v : null; }
+  catch(e){ return null; }
+}
+function saveCfg(c){ try { localStorage.setItem(CFG_KEY, JSON.stringify(c)); } catch(e){} cfg = c; }
+function meName(){ return (cfg.names[cfg.me] || "you"); }
+function themName(){ return (cfg.names[1 - cfg.me] || "the other one"); }
+function meId(){ return "p" + cfg.me; }
+function themId(){ return "p" + (1 - cfg.me); }
+
+function rndId(n){
+  var a = "abcdefghjkmnpqrstuvwxyz23456789", s = "";
+  var buf = new Uint8Array(n); (crypto || window.crypto).getRandomValues(buf);
+  for (var i = 0; i < n; i++) s += a[buf[i] % a.length];
+  return s;
+}
+
+/* ============================================================
+   tiny helpers
+   ============================================================ */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+  return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]; }); }
+
+var toastT = null;
+function toast(msg){
+  var el = document.querySelector(".toast");
+  if (el) el.remove();
+  el = document.createElement("div");
+  el.className = "toast"; el.textContent = msg;
+  document.body.appendChild(el);
+  clearTimeout(toastT);
+  toastT = setTimeout(function(){ el.remove(); }, 2600);
+}
+function copy(text, ok){
+  function fallback(){
+    var t = document.createElement("textarea");
+    t.value = text; t.style.position = "fixed"; t.style.opacity = "0";
+    document.body.appendChild(t); t.select();
+    try { document.execCommand("copy"); toast(ok); } catch(e){ toast("I could not copy that"); }
+    t.remove();
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){ toast(ok); }, fallback);
+  } else fallback();
+}
+
+var cur = "";
+function show(name){
+  var all = document.querySelectorAll(".scr");
+  for (var i = 0; i < all.length; i++) all[i].classList.remove("on");
+  $("s-" + name).classList.add("on");
+  window.scrollTo(0, 0);
+  cur = name;
+  stopPolls();
+  if (name === "home") pollHome();
+  if (name === "wait") pollWait();
+}
+
+/* ============================================================
+   supabase — plain REST. Realtime can't see the pair header,
+   so everything polls instead. At two people that is free.
+   ============================================================ */
+function sbHeaders(){
+  return { "apikey": cfg.key, "Authorization": "Bearer " + cfg.key,
+           "x-pair": cfg.pair, "Content-Type": "application/json" };
+}
+function sb(path, opts){
+  opts = opts || {};
+  return fetch(cfg.url + "/rest/v1/" + path, {
+    method: opts.method || "GET",
+    headers: Object.assign(sbHeaders(), opts.headers || {}),
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function(r){
+    if (!r.ok) return r.text().then(function(t){ throw new Error(t || ("HTTP " + r.status)); });
+    return r.status === 204 ? null : r.json();
+  });
+}
+function getRounds(){
+  if (DEMO) return Promise.resolve(fake.rounds());
+  return sb("rounds?select=*&order=created_at.desc&limit=12");
+}
+function getRound(id){
+  if (DEMO) return Promise.resolve(fake.round(id));
+  return sb("rounds?select=*&id=eq." + encodeURIComponent(id)).then(function(r){ return r[0] || null; });
+}
+function putRound(row){
+  if (DEMO) return Promise.resolve(fake.putRound(row));
+  return sb("rounds", { method:"POST", body: row, headers:{ "Prefer":"return=representation" } });
+}
+function getBallots(roundId){
+  if (DEMO) return Promise.resolve(fake.ballots(roundId));
+  return sb("ballots?select=*&round_id=eq." + encodeURIComponent(roundId));
+}
+/* every ballot for a set of rounds, in one request — the home screen's poll */
+function getBallotsFor(ids){
+  if (!ids.length) return Promise.resolve([]);
+  if (DEMO) return Promise.resolve(fake.ballotsFor(ids));
+  return sb("ballots?select=round_id,voter,votes,done&round_id=in.(" + ids.join(",") + ")");
+}
+function putBallot(roundId, votes, done){
+  if (DEMO) return Promise.resolve(fake.putBallot(roundId, meId(), votes, done));
+  return sb("ballots", {
+    method: "POST",
+    headers: { "Prefer": "resolution=merge-duplicates,return=minimal" },
+    body: { round_id: roundId, pair: cfg.pair, voter: meId(),
+            votes: votes, done: !!done, updated_at: new Date().toISOString() }
+  });
+}
+
+/* the demo's backend: localStorage, plus a partner who swipes at random */
+var fake = (function(){
+  var K = "cas.demo";
+  function all(){ try { return JSON.parse(localStorage.getItem(K) || '{"r":[],"b":[]}'); } catch(e){ return {r:[],b:[]}; } }
+  function put(s){ try { localStorage.setItem(K, JSON.stringify(s)); } catch(e){} }
+  return {
+    rounds: function(){ var s = all(); return s.r.slice().reverse(); },
+    round:  function(id){ var s = all(); return s.r.filter(function(x){ return x.id === id; })[0] || null; },
+    putRound: function(row){
+      var s = all();
+      row.created_at = new Date().toISOString();
+      s.r.push(row);
+      // the imaginary partner makes up their mind straight away
+      var v = {};
+      row.dishes.forEach(function(d, i){ if (Math.random() < 0.45) v[String(i)] = 1; else v[String(i)] = 0; });
+      s.b.push({ round_id: row.id, voter: "p1", votes: v, done: true });
+      put(s); return row;
+    },
+    ballots: function(id){ return all().b.filter(function(b){ return b.round_id === id; }); },
+    ballotsFor: function(ids){ return all().b.filter(function(b){ return ids.indexOf(b.round_id) >= 0; }); },
+    putBallot: function(id, voter, votes, done){
+      var s = all(), hit = null;
+      s.b.forEach(function(b){ if (b.round_id === id && b.voter === voter) hit = b; });
+      if (hit){ hit.votes = votes; hit.done = !!done; }
+      else s.b.push({ round_id: id, voter: voter, votes: votes, done: !!done });
+      put(s); return null;
+    }
+  };
+})();
+
+/* a menu so the demo has something to swipe without a camera or a key */
+var DEMO_DISHES = [
+  ["Croquetas de jamón ibérico","Molten béchamel inside, a shell that shatters when you bite it.","9,50 €","To pick at"],
+  ["Pimientos de Padrón","Some are hot, some are not — that is the whole game.","7,00 €","To pick at"],
+  ["Tortilla de patatas poco cuajada","Runny in the middle. Half an hour of debate guaranteed.","11,00 €","To pick at"],
+  ["Pulpo a la gallega","Boiled octopus on potato with paprika and a lot of olive oil.","18,50 €","From the sea"],
+  ["Boquerones en vinagre","Anchovy fillets cured in vinegar with garlic and parsley.","8,00 €","From the sea"],
+  ["Ensaladilla rusa","Potato, tuna and mayonnaise, with croutons on top.","8,50 €","To pick at"],
+  ["Chipirones a la plancha","Baby squid on the griddle with garlic, lemon and nothing else.","16,00 €","From the sea"],
+  ["Alcachofas confitadas","Artichokes confited in oil and finished over coals.","12,00 €","Vegetables"],
+  ["Huevos rotos con chistorra","Chips, a broken egg over the top, and Navarran chistorra sausage.","13,50 €","To share"],
+  ["Secreto ibérico a la brasa","Acorn-fed pork secreto over coals with coarse salt.","19,00 €","Meat"],
+  ["Arroz meloso de setas","Creamy seasonal rice with wild mushrooms and parmesan.","17,50 €","Rice"],
+  ["Pan con tomate","Glass bread rubbed with tomato and olive oil.","3,50 €","To pick at"],
+  ["Berenjena con miel de caña","Fried in batons and drizzled with cane molasses.","9,00 €","Vegetables"],
+  ["Steak tartar de vaca vieja","Hand-cut, with a cured yolk and toast.","21,00 €","Meat"]
+];
+
+/* ============================================================
+   gemini — reads the menu photo into dishes
+   ============================================================ */
+var MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
+
+var PROMPT =
+"You are reading photos of a restaurant menu.\n\n" +
+"Extract ONLY savoury food dishes that a person would order to eat.\n\n" +
+"INCLUDE: starters, tapas, raciones, salads, soups, rice, pasta, fish, meat, eggs, vegetables, " +
+"sandwiches, burgers, pizzas, sides, bread with toppings, and set-menu dishes listed by name.\n\n" +
+"EXCLUDE COMPLETELY, no exceptions: every drink (water, wine, beer, vermouth, soft drinks, juice, " +
+"coffee, tea, spirits, cocktails), every dessert and sweet (ice cream, cake, flan, fruit, pastries, " +
+"cheesecake, chocolate), bread-and-cover charges, allergen legends, opening hours, addresses, " +
+"wifi passwords, prices with no dish, and section headings on their own.\n\n" +
+"For each dish return:\n" +
+"- name: exactly as printed, in the menu's own language. Repair only obvious OCR damage.\n" +
+"- note: ALWAYS IN ENGLISH, under 140 characters. Translate the menu's own description if it has " +
+"one; if it does not, write your own plain 8-14 word description of what the dish actually is. " +
+"This is so the pair can read a menu in a language they do not speak.\n" +
+"- price: as printed, with its currency symbol, e.g. \"9,50 €\". Empty string if no price is shown.\n" +
+"- section: the menu's own heading for that dish, translated to English. Empty string if none.\n\n" +
+"Also return place: the restaurant's name if it is legible, else an empty string.\n\n" +
+"Return at most 60 dishes, in the order they appear on the menu. " +
+"If these photos are not a menu, return an empty dishes array.";
+
+var SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    place: { type: "STRING" },
+    dishes: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          name:    { type: "STRING" },
+          note:    { type: "STRING" },
+          price:   { type: "STRING" },
+          section: { type: "STRING" }
+        },
+        required: ["name", "note", "price", "section"]
+      }
+    }
+  },
+  required: ["place", "dishes"]
+};
+
+function askGemini(images, model){
+  var parts = [{ text: PROMPT }];
+  images.forEach(function(b64){ parts.push({ inline_data: { mime_type: "image/jpeg", data: b64 } }); });
+
+  return fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model +
+               ":generateContent?key=" + encodeURIComponent(cfg.gkey), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: parts }],
+      generationConfig: { temperature: 0.2, responseMimeType: "application/json", responseSchema: SCHEMA }
+    })
+  }).then(function(r){
+    return r.text().then(function(t){
+      if (!r.ok){ var e = new Error(t || ("HTTP " + r.status)); e.status = r.status; throw e; }
+      return JSON.parse(t);
+    });
+  }).then(function(j){
+    var c = j && j.candidates && j.candidates[0];
+    var txt = c && c.content && c.content.parts && c.content.parts[0] && c.content.parts[0].text;
+    if (!txt) throw new Error("Gemini returned nothing readable.");
+    return JSON.parse(txt);
+  });
+}
+
+function readMenu(images){
+  var i = 0;
+  function attempt(){
+    return askGemini(images, MODELS[i])["catch"](function(err){
+      // a model name this key can't reach — try the next one, once
+      var retryable = err.status === 404 || err.status === 400;
+      if (retryable && i < MODELS.length - 1){ i++; return attempt(); }
+      throw err;
+    });
+  }
+  return attempt();
+}
+
+/* ============================================================
+   photo -> downsized jpeg base64
+   ============================================================ */
+function shrink(file, maxDim){
+  return new Promise(function(res, rej){
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function(){
+      var w = img.naturalWidth, h = img.naturalHeight;
+      var s = Math.min(1, maxDim / Math.max(w, h));
+      var cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
+      var cv = document.createElement("canvas");
+      cv.width = cw; cv.height = ch;
+      var cx = cv.getContext("2d");
+      cx.fillStyle = "#fff"; cx.fillRect(0, 0, cw, ch);
+      cx.drawImage(img, 0, 0, cw, ch);
+      URL.revokeObjectURL(url);
+      try { res(cv.toDataURL("image/jpeg", 0.82).split(",")[1]); }
+      catch(e){ rej(new Error("I could not read that photo.")); }
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); rej(new Error("I could not open that photo.")); };
+    img.src = url;
+  });
+}
+
+/* ============================================================
+   the loading bar — a real one, eased toward each stage
+   ============================================================ */
+var barTarget = 0, barAt = 0, barRaf = 0, barEl = null, pctEl = null;
+function barStart(bar, pct){
+  barEl = bar; pctEl = pct; barAt = 0; barTarget = 0;
+  cancelAnimationFrame(barRaf);
+  (function tick(){
+    barAt += (barTarget - barAt) * 0.055;
+    if (barAt > 99.4) barAt = 99.4;
+    barEl.style.width = barAt.toFixed(1) + "%";
+    if (pctEl) pctEl.textContent = Math.round(barAt) + "%";
+    barRaf = requestAnimationFrame(tick);
+  })();
+}
+function barTo(p){ barTarget = p; }
+function barDone(){
+  cancelAnimationFrame(barRaf);
+  if (barEl) barEl.style.width = "100%";
+  if (pctEl) pctEl.textContent = "100%";
+}
+
+var COOK_LINES = [
+  "Reading the small print…",
+  "Throwing out all the drinks…",
+  "Ignoring the desserts, sorry…",
+  "Telling the tapas from the raciones…",
+  "Counting croquettes…",
+  "Distrusting the chef's suggestion…",
+  "Nearly there…"
+];
+var cookT = null;
+function cookLines(){
+  var i = 0;
+  $("cookStep").textContent = COOK_LINES[0];
+  clearInterval(cookT);
+  cookT = setInterval(function(){
+    i = (i + 1) % COOK_LINES.length;
+    $("cookStep").textContent = COOK_LINES[i];
+  }, 2300);
+}
+
+/* ============================================================
+   taking the photo
+   ============================================================ */
+var lastFiles = null;
+
+$("shootBtn").addEventListener("click", function(){
+  if (DEMO) return cookDemo();
+  $("shootIn").click();
+});
+$("shootIn").addEventListener("change", function(e){
+  var files = [].slice.call(e.target.files || []).slice(0, 4);
+  e.target.value = "";
+  if (!files.length) return;
+  lastFiles = files;
+  cook(files);
+});
+$("cookRetry").addEventListener("click", function(){ if (lastFiles) cook(lastFiles); });
+$("cookBack").addEventListener("click", function(){ show("home"); });
+
+function cookFail(msg){
+  clearInterval(cookT);
+  cancelAnimationFrame(barRaf);
+  $("cookTitle").textContent = "It choked";
+  $("cookStep").textContent = "";
+  $("cookMsg").textContent = msg;
+  $("cookFail").classList.remove("hide");
+}
+
+function cookDemo(){
+  show("cook");
+  $("cookFail").classList.add("hide");
+  $("cookTitle").textContent = "Reading the menu";
+  $("cookPill").textContent = "demo";
+  barStart($("cookBar"), $("cookPct"));
+  cookLines();
+  barTo(30);
+  setTimeout(function(){ barTo(90); }, 500);
+  setTimeout(function(){
+    barTo(100); barDone(); clearInterval(cookT);
+    var row = {
+      id: rndId(6), pair: cfg.pair, place: "Bar Manolo", shot_by: meId(),
+      dishes: DEMO_DISHES.map(function(d){
+        return { name: d[0], note: d[1], price: d[2], section: d[3] };
+      })
+    };
+    putRound(row).then(function(){ setTimeout(function(){ openGo(row); }, 400); });
+  }, 2400);
+}
+
+function cook(files){
+  show("cook");
+  $("cookFail").classList.add("hide");
+  $("cookTitle").textContent = "Reading the menu";
+  $("cookPill").textContent = files.length > 1 ? files.length + " photos" : "1 photo";
+  barStart($("cookBar"), $("cookPct"));
+  cookLines();
+  barTo(10);
+
+  Promise.all(files.map(function(f){ return shrink(f, 1600); }))
+    .then(function(imgs){
+      barTo(26);
+      setTimeout(function(){ barTo(88); }, 400);   // the long wait is Gemini thinking
+      return readMenu(imgs);
+    })
+    .then(function(out){
+      var dishes = (out.dishes || []).filter(function(d){ return d && d.name && String(d.name).trim(); });
+      if (!dishes.length) throw new Error("I could not find any dishes in that photo. Try more light, closer in, or the menu flatter.");
+      barTo(94);
+      var row = {
+        id: rndId(6),
+        pair: cfg.pair,
+        place: String(out.place || "").slice(0, 80),
+        shot_by: meId(),
+        dishes: dishes.slice(0, 60).map(function(d){
+          return { name: String(d.name).trim().slice(0, 120),
+                   note: String(d.note || "").trim().slice(0, 180),
+                   price: String(d.price || "").trim().slice(0, 20),
+                   section: String(d.section || "").trim().slice(0, 50) };
+        })
+      };
+      return putRound(row).then(function(){ return row; });
+    })
+    .then(function(row){
+      barTo(100); barDone(); clearInterval(cookT);
+      setTimeout(function(){ openGo(row); }, 420);
+    })
+    ["catch"](function(err){
+      var m = String(err && err.message || err);
+      if (/API key|API_KEY|PERMISSION_DENIED|API key not valid/i.test(m))
+        m = "Gemini will not take that key. Check it in settings.";
+      else if (/RESOURCE_EXHAUSTED|quota|429/i.test(m))
+        m = "Gemini says the free quota is used up for today. It comes back on its own tomorrow.";
+      else if (/Failed to fetch|NetworkError/i.test(m))
+        m = "No connection. This one step needs the internet.";
+      else if (/relation .* does not exist|PGRST/i.test(m))
+        m = "Supabase has no tables. Run the SQL from step 2 again.";
+      cookFail(m);
+    });
+}
+
+/* ============================================================
+   GO
+   ============================================================ */
+var round = null;     // the row we are voting on
+
+function openGo(row){
+  round = row;
+  $("goPlace").textContent = row.place ? row.place : "The menu is ready";
+  $("goCount").textContent = row.dishes.length + " dishes · " +
+    (row.shot_by === meId() ? "you took the photo" : themName() + " took the photo");
+  $("goPill").textContent = row.id;
+  show("go");
+}
+$("goBack").addEventListener("click", function(){ show("home"); });
+$("goBtn").addEventListener("click", function(){ startDeck(round); });
+
+/* ============================================================
+   the deck
+   ============================================================ */
+var votes = {}, idx = 0, hist = [], pushT = null, lastThem = null;
+
+function startDeck(row){
+  round = row;
+  votes = {}; idx = 0; hist = [];
+  getBallots(row.id).then(function(bs){
+    bs.forEach(function(b){
+      if (b.voter === meId() && b.votes){ votes = b.votes; }
+      if (b.voter === themId()) lastThem = b;
+    });
+    // resume where I left off
+    idx = 0;
+    while (idx < row.dishes.length && votes[String(idx)] !== undefined) idx++;
+    if (idx >= row.dishes.length){ finishDeck(); return; }
+    show("deck");
+    renderDeck();
+  })["catch"](function(){
+    show("deck"); renderDeck();
+  });
+}
+
+function sizeClass(name){
+  var n = name.length;
+  return n > 46 ? "xs" : (n > 26 ? "sm" : "");
+}
+
+function cardHTML(d, n, total){
+  // the two spacers float the dish a little above centre, so a one-line tapa
+  // doesn't sit marooned at the top of a tall white card
+  return '<div style="flex:0.85 1 0"></div>' +
+         '<span class="sec">' + esc(d.section || "dish " + n) + '</span>' +
+         '<h2 class="' + sizeClass(d.name) + '">' + esc(d.name) + '</h2>' +
+         (d.note ? '<p class="desc">' + esc(d.note) + '</p>' : '') +
+         '<div style="flex:1.15 1 0"></div>' +
+         '<div class="bot"><span class="price">' + esc(d.price || "—") + '</span>' +
+         '<span class="of">' + n + ' of ' + total + '</span></div>' +
+         '<div class="stamp yes">YES</div><div class="stamp no">NOPE</div>';
+}
+
+function renderDeck(){
+  var box = $("deckBox");
+  var total = round.dishes.length;
+  box.innerHTML = "";
+
+  for (var k = Math.min(idx + 2, total - 1); k >= idx; k--){
+    var d = round.dishes[k];
+    var el = document.createElement("div");
+    var depth = k - idx;
+    if (depth === 0){
+      el.className = "swipe";
+      el.innerHTML = cardHTML(d, k + 1, total);
+      arm(el);
+    } else {
+      // narrower and pushed down, so the stack peeks out under the live card
+      el.className = "under";
+      el.style.transform = "scale(" + (1 - depth * 0.045) + ") translateY(" + (depth * 26) + "px)";
+      el.style.opacity = depth === 1 ? "0.58" : "0.3";
+    }
+    box.appendChild(el);
+  }
+
+  $("deckCount").textContent = idx + " / " + total;
+  $("btnUndo").style.opacity = hist.length ? "1" : "0.35";
+  footTally();
+}
+
+function footTally(){
+  var mine = Object.keys(votes).length;
+  var theirs = lastThem && lastThem.votes ? Object.keys(lastThem.votes).length : 0;
+  $("deckFoot").textContent = themName() + " is on " + theirs + " · you are on " + mine;
+}
+
+/* drag */
+function arm(card){
+  var startX = 0, startY = 0, dx = 0, dy = 0, down = false, t0 = 0;
+  var yes = card.querySelector(".stamp.yes"), no = card.querySelector(".stamp.no");
+
+  function place(){
+    var rot = dx / 14;
+    card.style.transform = "translate(" + dx + "px," + dy + "px) rotate(" + rot + "deg)";
+    var p = Math.min(1, Math.abs(dx) / 95);
+    yes.style.opacity = dx > 0 ? p : 0;
+    no.style.opacity  = dx < 0 ? p : 0;
+  }
+
+  card.addEventListener("pointerdown", function(e){
+    down = true; t0 = Date.now();
+    startX = e.clientX; startY = e.clientY; dx = 0; dy = 0;
+    card.style.transition = "none";
+    try { card.setPointerCapture(e.pointerId); } catch(err){}
+  });
+  card.addEventListener("pointermove", function(e){
+    if (!down) return;
+    dx = e.clientX - startX;
+    dy = (e.clientY - startY) * 0.4;
+    place();
+  });
+  function up(){
+    if (!down) return;
+    down = false;
+    var fast = (Date.now() - t0) < 320 && Math.abs(dx) > 48;
+    if (Math.abs(dx) > 92 || fast){ fling(card, dx > 0); }
+    else {
+      card.style.transition = "transform .26s cubic-bezier(.2,.9,.3,1)";
+      card.style.transform = "translate(0,0) rotate(0deg)";
+      yes.style.opacity = 0; no.style.opacity = 0;
+    }
+  }
+  card.addEventListener("pointerup", up);
+  card.addEventListener("pointercancel", up);
+}
+
+function fling(card, liked){
+  var to = liked ? window.innerWidth + 260 : -(window.innerWidth + 260);
+  card.style.transition = "transform .32s ease-out, opacity .32s ease-out";
+  card.style.transform = "translate(" + to + "px,-40px) rotate(" + (liked ? 26 : -26) + "deg)";
+  card.style.opacity = "0";
+  decide(liked);
+}
+
+function decide(liked){
+  votes[String(idx)] = liked ? 1 : 0;
+  hist.push(idx);
+  idx++;
+  pushVotes(false);
+  if (navigator.vibrate) { try { navigator.vibrate(liked ? 18 : 9); } catch(e){} }
+  setTimeout(function(){
+    if (idx >= round.dishes.length) finishDeck();
+    else renderDeck();
+  }, 180);
+}
+
+function tapDecide(liked){
+  var card = $("deckBox").querySelector(".swipe");
+  if (!card) return;
+  var s = card.querySelector(liked ? ".stamp.yes" : ".stamp.no");
+  s.style.opacity = "1";
+  fling(card, liked);
+}
+$("btnYes").addEventListener("click", function(){ tapDecide(true); });
+$("btnNo").addEventListener("click", function(){ tapDecide(false); });
+$("btnUndo").addEventListener("click", function(){
+  if (!hist.length) return;
+  idx = hist.pop();
+  delete votes[String(idx)];
+  pushVotes(false);
+  renderDeck();
+});
+$("deckQuit").addEventListener("click", function(){
+  pushVotes(false);
+  show("home");
+});
+
+/* every vote is pushed, debounced — losing a swipe to a dead battery is annoying */
+function pushVotes(done){
+  clearTimeout(pushT);
+  var fire = function(){
+    putBallot(round.id, votes, done)["catch"](function(){ /* retried on the next swipe */ });
+  };
+  if (done) fire(); else pushT = setTimeout(fire, 900);
+}
+
+function finishDeck(){
+  clearTimeout(pushT);
+  putBallot(round.id, votes, true)["catch"](function(){
+    toast("Saved on this phone; I will send it up when the connection is back.");
+  });
+  show("wait");
+}
+
+/* ============================================================
+   waiting for the other one
+   ============================================================ */
+var pollT = null;
+function stopPolls(){ clearInterval(pollT); pollT = null; }
+
+$("waitBack").addEventListener("click", function(){ show("home"); });
+$("waitPeek").addEventListener("click", function(){ openResults(true); });
+
+function pollWait(){
+  var total = round.dishes.length;
+  $("waitPill").textContent = round.id;
+  $("waitTitle").textContent = "You are done";
+
+  function tick(){
+    getBallots(round.id).then(function(bs){
+      var them = null;
+      bs.forEach(function(b){ if (b.voter === themId()) them = b; });
+      lastThem = them;
+      var n = them && them.votes ? Object.keys(them.votes).length : 0;
+      var pc = total ? Math.round(n / total * 100) : 0;
+      $("waitBar").style.width = pc + "%";
+      $("waitPct").textContent = n + " of " + total;
+      $("waitStep").textContent = them && them.done
+        ? themName() + " has finished too"
+        : (n === 0 ? themName() + " has not started yet" : themName() + " is on number " + n);
+      if (them && them.done){ stopPolls(); openResults(false); }
+    })["catch"](function(){ $("waitStep").textContent = "Offline… retrying"; });
+  }
+  tick();
+  pollT = setInterval(function(){ if (!document.hidden) tick(); }, 3000);
+}
+
+/* ============================================================
+   results
+   ============================================================ */
+var NONE = [
+  "Zero matches. Order bread and reconsider the relationship.",
+  "Nothing in common. The waiter decides tonight.",
+  "Not one. That says more about you two than about the menu."
+];
+
+$("resHome").addEventListener("click", function(){ show("home"); });
+
+function openResults(partial){
+  stopPolls();
+  getBallots(round.id).then(function(bs){
+    var mine = {}, theirs = {}, themDone = false;
+    bs.forEach(function(b){
+      if (b.voter === meId())  mine = b.votes || {};
+      if (b.voter === themId()){ theirs = b.votes || {}; themDone = !!b.done; }
+    });
+    render(mine, theirs, themDone);
+  })["catch"](function(){
+    toast("I could not fetch the votes. Is there a connection?");
+  });
+
+  function render(mine, theirs, themDone){
+    var both = [], onlyMe = [], onlyThem = [];
+    round.dishes.forEach(function(d, i){
+      var a = mine[String(i)] === 1, b = theirs[String(i)] === 1;
+      if (a && b) both.push(d);
+      else if (a) onlyMe.push(d);
+      else if (b) onlyThem.push(d);
+    });
+
+    $("resPill").textContent = round.place ? round.place.slice(0, 18) : round.id;
+    $("resN").textContent = both.length;
+    $("resH").textContent = both.length === 1 ? "match" : "matches";
+    $("resP").textContent = both.length === 0
+      ? NONE[Math.floor(Math.random() * NONE.length)]
+      : (themDone ? "This is what you both said yes to."
+                  : themName() + " is still swiping — this is only half of it.");
+
+    var h = "";
+    both.forEach(function(d, i){
+      h += '<div class="hit"><span class="num">' + (i + 1) + '</span><div style="min-width:0">' +
+           '<h4>' + esc(d.name) + '</h4>' +
+           (d.note ? '<p>' + esc(d.note) + '</p>' : '') +
+           '</div>' + (d.price ? '<span class="pr">' + esc(d.price) + '</span>' : '') + '</div>';
+    });
+
+    if (onlyMe.length || onlyThem.length){
+      h += '<div class="hr">only one of you</div>';
+      onlyMe.forEach(function(d){
+        h += '<div class="solo"><span class="w">' + esc(meName()) + '</span><span>' + esc(d.name) + '</span></div>';
+      });
+      onlyThem.forEach(function(d){
+        h += '<div class="solo"><span class="w">' + esc(themName()) + '</span><span>' + esc(d.name) + '</span></div>';
+      });
+    }
+    $("resList").innerHTML = h;
+    show("res");
+  }
+}
+
+/* ============================================================
+   home — what is going on right now
+   ============================================================ */
+function pollHome(){
+  $("homeFoot").textContent = "You are " + meName() + " · " + themName() + " on the other phone";
+  function tick(){
+    getRounds().then(function(rows){
+      if (!rows.length){ $("homeCards").innerHTML = ""; return; }
+      var ids = rows.map(function(r){ return r.id; });
+      return getBallotsFor(ids).then(function(bs){ paint(rows, bs); });
+    })["catch"](function(){ /* offline: leave the last paint alone */ });
+  }
+  tick();
+  pollT = setInterval(function(){ if (!document.hidden) tick(); }, 5000);
+}
+
+function paint(rows, ballots){
+  var fresh = Date.now() - 1000 * 60 * 60 * 5;   // anything older than 5h is yesterday's dinner
+  var h = "", shown = 0;
+
+  rows.forEach(function(r){
+    if (shown >= 2) return;
+    if (new Date(r.created_at).getTime() < fresh) return;
+
+    var mine = null, them = null;
+    ballots.forEach(function(b){
+      if (b.round_id !== r.id) return;
+      if (b.voter === meId()) mine = b;
+      if (b.voter === themId()) them = b;
+    });
+    var total = (r.dishes || []).length;
+    var myN = mine && mine.votes ? Object.keys(mine.votes).length : 0;
+    var theirN = them && them.votes ? Object.keys(them.votes).length : 0;
+    var where = r.place || "A menu with no name";
+
+    var kicker, title, line, label;
+    if (mine && mine.done && them && them.done){
+      kicker = "ready"; title = where;
+      line = "You have both finished."; label = "See the matches";
+    } else if (mine && mine.done){
+      kicker = "waiting"; title = where;
+      line = themName() + " is on " + theirN + " of " + total + "."; label = "See how it is going";
+    } else if (myN > 0){
+      kicker = "half done"; title = where;
+      line = (total - myN) + " dishes left."; label = "Keep swiping";
+    } else {
+      kicker = r.shot_by === meId() ? "your menu" : themName() + " scanned a menu";
+      title = where;
+      line = total + " dishes waiting."; label = "GO";
+    }
+
+    h += '<div class="card-note" data-id="' + esc(r.id) + '">' +
+         '<div class="k">' + esc(kicker) + '</div>' +
+         '<h4>' + esc(title) + '</h4>' +
+         '<p>' + esc(line) + '</p>' +
+         '<button class="big" data-open="' + esc(r.id) + '" style="padding:14px;font-size:15px">' +
+            esc(label) + '</button></div>';
+    shown++;
+  });
+
+  var box = $("homeCards");
+  if (box.innerHTML !== h){
+    box.innerHTML = h;
+    [].slice.call(box.querySelectorAll("[data-open]")).forEach(function(btn){
+      btn.addEventListener("click", function(){ openRound(btn.getAttribute("data-open")); });
+    });
+  }
+}
+
+function openRound(id){
+  getRound(id).then(function(row){
+    if (!row) return toast("That round is gone.");
+    return getBallots(id).then(function(bs){
+      var mine = null, them = null;
+      bs.forEach(function(b){
+        if (b.voter === meId()) mine = b;
+        if (b.voter === themId()) them = b;
+      });
+      round = row; lastThem = them;
+      if (mine && mine.done){
+        votes = mine.votes || {};
+        if (them && them.done) openResults(false); else show("wait");
+      } else if (mine && Object.keys(mine.votes || {}).length){
+        startDeck(row);
+      } else {
+        openGo(row);
+      }
+    });
+  })["catch"](function(){ toast("I could not open it. Is there a connection?"); });
+}
+
+/* ============================================================
+   setup
+   ============================================================ */
+var SQL = "";
+fetch("supabase.sql").then(function(r){ return r.text(); })
+  .then(function(t){ SQL = t; $("sqlBox").textContent = t; })
+  ["catch"](function(){ $("sqlBox").textContent = "I could not load supabase.sql — it sits next to this page in the repo."; });
+$("sqlCopy").addEventListener("click", function(){ copy(SQL, "SQL copied"); });
+
+var pickedWho = null;
+function wireWho(boxId, onPick){
+  var box = $(boxId);
+  [].slice.call(box.querySelectorAll("button")).forEach(function(b){
+    b.addEventListener("click", function(){
+      [].slice.call(box.querySelectorAll("button")).forEach(function(o){ o.setAttribute("aria-pressed", "false"); });
+      b.setAttribute("aria-pressed", "true");
+      onPick(Number(b.getAttribute("data-i")));
+    });
+  });
+}
+wireWho("whoPick", function(i){ pickedWho = i; });
+
+function refreshWhoLabels(){
+  var a = ($("nmA").value || "").trim() || "Name 1";
+  var b = ($("nmB").value || "").trim() || "Name 2";
+  var btns = $("whoPick").querySelectorAll("button");
+  btns[0].textContent = a; btns[1].textContent = b;
+}
+$("nmA").addEventListener("input", refreshWhoLabels);
+$("nmB").addEventListener("input", refreshWhoLabels);
+
+$("setupGo").addEventListener("click", function(){
+  var url = ($("sbUrl").value || "").trim().replace(/\/+$/, "");
+  var key = ($("sbKey").value || "").trim();
+  var gk  = ($("gKey").value  || "").trim();
+  var a   = ($("nmA").value   || "").trim();
+  var b   = ($("nmB").value   || "").trim();
+  function bad(m){ $("setupErr").textContent = m; }
+
+  if (!/^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/i.test(url))
+    return bad("The Project URL should look like https://something.supabase.co");
+  if (key.length < 20) return bad("That publishable key looks short.");
+  if (gk.length < 20)  return bad("That Gemini key looks short.");
+  if (!a || !b)        return bad("Both names are missing.");
+  if (pickedWho === null) return bad("Tell me who is holding this phone.");
+
+  saveCfg({ url:url, key:key, gkey:gk, pair:rndId(10), names:[a, b], me:pickedWho });
+  boot();
+});
+
+/* pairing link */
+function pairPayload(){
+  return btoa(unescape(encodeURIComponent(JSON.stringify({
+    u: cfg.url, k: cfg.key, g: cfg.gkey, p: cfg.pair, n: cfg.names
+  })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function pairLink(){
+  return location.href.split("#")[0] + "#p=" + pairPayload();
+}
+function readPair(frag){
+  var m = /[#&]p=([A-Za-z0-9\-_]+)/.exec(frag || "");
+  if (!m) return null;
+  try {
+    var s = m[1].replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    var o = JSON.parse(decodeURIComponent(escape(atob(s))));
+    if (o && o.u && o.k && o.p && o.n) return o;
+  } catch(e){}
+  return null;
+}
+
+function adoptPair(o){
+  saveCfg({ url:o.u, key:o.k, gkey:o.g || "", pair:o.p, names:o.n, me:null });
+  // who is holding this phone?
+  $("sbUrl").value = o.u; $("sbKey").value = o.k; $("gKey").value = o.g || "";
+  $("nmA").value = o.n[0]; $("nmB").value = o.n[1];
+  refreshWhoLabels();
+  show("setup");
+  document.querySelector(".warn").innerHTML =
+    '<b>Paired.</b> One thing left: say who is holding this phone, down below, then hit Start.';
+  setTimeout(function(){ $("whoPick").scrollIntoView({ behavior:"smooth", block:"center" }); }, 120);
+}
+
+$("pairGo").addEventListener("click", function(){
+  var o = readPair($("pairIn").value || "");
+  if (!o) return toast("That link has nothing inside it.");
+  adoptPair(o);
+});
+
+/* ============================================================
+   settings
+   ============================================================ */
+$("gearBtn").addEventListener("click", function(){
+  $("pairLink").textContent = pairLink();
+  $("gKey2").value = cfg.gkey || "";
+  var btns = $("whoPick2").querySelectorAll("button");
+  btns[0].textContent = cfg.names[0]; btns[1].textContent = cfg.names[1];
+  btns[0].setAttribute("aria-pressed", String(cfg.me === 0));
+  btns[1].setAttribute("aria-pressed", String(cfg.me === 1));
+  show("set");
+});
+$("setBack").addEventListener("click", function(){ show("home"); });
+$("pairCopy").addEventListener("click", function(){ copy(pairLink(), "Link copied"); });
+
+var who2 = null;
+wireWho("whoPick2", function(i){ who2 = i; });
+$("saveSet").addEventListener("click", function(){
+  var c = loadCfg() || cfg;
+  if (who2 !== null) c.me = who2;
+  c.gkey = ($("gKey2").value || "").trim();
+  saveCfg(c);
+  toast("Saved");
+  show("home");
+});
+$("wipeBtn").addEventListener("click", function(){
+  if (!confirm("Erase the keys on this phone?")) return;
+  try { localStorage.removeItem(CFG_KEY); } catch(e){}
+  location.hash = "";
+  location.reload();
+});
+
+/* ============================================================
+   boot
+   ============================================================ */
+function boot(){
+  cfg = loadCfg();
+
+  if (DEMO){
+    cfg = { url:"", key:"", gkey:"", pair:"demo", names:["Dani","Ana"], me:0 };
+    show("home");
+    return;
+  }
+
+  var incoming = readPair(location.hash);
+  if (incoming && (!cfg || cfg.pair !== incoming.p)){
+    history.replaceState(null, "", location.pathname + location.search);
+    adoptPair(incoming);
+    return;
+  }
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+
+  if (!cfg || cfg.me === null || cfg.me === undefined){
+    if (cfg){ // paired but nobody said who
+      $("sbUrl").value = cfg.url; $("sbKey").value = cfg.key; $("gKey").value = cfg.gkey || "";
+      $("nmA").value = cfg.names[0]; $("nmB").value = cfg.names[1];
+      refreshWhoLabels();
+    }
+    show("setup");
+    return;
+  }
+  show("home");
+}
+
+if ("serviceWorker" in navigator){
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("sw.js")["catch"](function(){});
+  });
+}
+
+boot();
+})();
+</script>
+</body>
+</html>
