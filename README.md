@@ -72,14 +72,14 @@ random, everything saved on that device only. No keys, no camera, no Supabase.
 ## Where things live
 
 ```
-app/index.html            the whole app — one file
-app/supabase.sql          the two tables, shown to you during setup
-app/sw.js                 offline shell
-app/manifest.webmanifest  the home-screen icon and name
-app/icons/                a heart with a bite out of it
+index.html            the whole app — one file
+supabase.sql          the two tables, shown to you during setup
+sw.js                 offline shell
+manifest.webmanifest  the home-screen icon and name
+icons/                a heart with a bite out of it
 ```
 
-Serve `app/` at the root of GitHub Pages, or point Pages at the `app` folder.
+GitHub Pages serves this repo's root, so the app is the repo.
 
 ## Worth knowing
 
