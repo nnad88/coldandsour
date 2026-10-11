@@ -47,6 +47,13 @@ input,textarea{font-family:inherit;font-size:16px}
 /* the one screen that is exactly the viewport and never scrolls — the buttons
    have to be under your thumb, not below the fold */
 #s-deck{height:100vh;height:100dvh;overflow:hidden}
+/* home fits the phone: the hero gives way as cards arrive, rather than pushing
+   the camera button off the bottom and making you scroll to reach it */
+#s-home{height:100vh;height:100dvh;overflow-y:auto}
+/* with a menu waiting, the headline is just shouting over the thing you came
+   for — it stands down and leaves the camera where your thumb expects it */
+#s-home.busy .hero h1{display:none}
+#s-home.busy .hero p{font-size:13px;margin-top:0}
 
 /* ---------- chrome ---------- */
 .top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 4px 12px;flex:none}
@@ -93,20 +100,24 @@ input,textarea{font-family:inherit;font-size:16px}
 .warn b{font-weight:700}
 
 /* ---------- home ---------- */
-.hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center;padding:10px 0}
-.hero h1{margin:0;font-size:44px;line-height:.92;font-weight:800;letter-spacing:-.035em;text-wrap:balance}
+.hero{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:5px;text-align:center;padding:6px 0}
+.hero h1{margin:0;font-size:clamp(32px,9.6vw,44px);line-height:.92;font-weight:800;
+  letter-spacing:-.035em;text-wrap:balance}
 .hero h1 em{font-style:normal;color:#FFE168}
-.hero p{margin:14px 0 0;font-size:14.5px;line-height:1.5;font-weight:500;color:rgba(255,255,255,.85);max-width:27ch}
-.shoot{margin-top:30px;width:116px;height:116px;border-radius:999px;background:#fff;
+.hero p{margin:12px 0 0;font-size:14.5px;line-height:1.45;font-weight:500;
+  color:rgba(255,255,255,.85);max-width:27ch}
+.shoot{margin-top:clamp(16px,4vh,30px);width:clamp(94px,25vw,116px);
+  height:clamp(94px,25vw,116px);flex:none;border-radius:999px;background:#fff;
   display:grid;place-items:center;box-shadow:0 14px 34px rgba(120,10,40,.32)}
 .shoot:active{transform:scale(.96)}
-.card-note{position:relative;background:rgba(0,0,0,.24);border-radius:18px;padding:16px;
-  margin-bottom:10px;text-align:left}
+.card-note{position:relative;background:rgba(0,0,0,.24);border-radius:18px;padding:14px;
+  margin-bottom:9px;text-align:left;flex:none}
 .toss{position:absolute;right:9px;top:9px;width:30px;height:30px;border-radius:999px;
   background:rgba(0,0,0,.3);display:grid;place-items:center;padding:0}
 .toss:active{transform:scale(.9)}
 .card-note .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#FFE168}
-.card-note h4{margin:7px 0 2px;font-size:17px;font-weight:700;letter-spacing:-.015em}
+.card-note h4{margin:6px 0 2px;font-size:17px;font-weight:700;letter-spacing:-.015em}
 .card-note p{margin:0 0 12px;font-size:13px;line-height:1.45;font-weight:500;color:rgba(255,255,255,.8)}
 
 /* ---------- photo tray ---------- */
@@ -1683,6 +1694,7 @@ function paint(rows, ballots){
   }
 
   var box = $("homeCards");
+  $("s-home").classList.toggle("busy", shown > 0);
   if (box.innerHTML !== h){
     box.innerHTML = h;
     [].slice.call(box.querySelectorAll("[data-open]")).forEach(function(btn){
@@ -1691,10 +1703,9 @@ function paint(rows, ballots){
     [].slice.call(box.querySelectorAll("[data-toss]")).forEach(function(btn){
       btn.addEventListener("click", function(){
         var id = btn.getAttribute("data-toss");
-        if (!confirm("Throw this menu away? It goes for both of you.")) return;
         skipRound(id);                       // so the poll cannot re-open it
         btn.closest(".card-note").remove();
-        dropRound(id).then(function(){ toast("Gone"); })
+        dropRound(id).then(function(){ toast("Menu binned"); })
           ["catch"](function(){ toast("Could not delete it — it may come back."); });
       });
     });
