@@ -114,6 +114,11 @@ input,textarea{font-family:inherit;font-size:16px}
   grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;align-content:start;padding-bottom:4px}
 .thumb{position:relative;aspect-ratio:3/4;border-radius:13px;overflow:hidden;background:rgba(0,0,0,.2)}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.noprev{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:5px;background:rgba(0,0,0,.26);text-align:center;padding:6px}
+.noprev b{font-family:var(--mono);font-size:13px;letter-spacing:.06em;color:#fff}
+.noprev span{font-family:var(--mono);font-size:8px;line-height:1.35;letter-spacing:.06em;
+  text-transform:uppercase;color:rgba(255,255,255,.66)}
 .thumb .n{position:absolute;left:7px;top:7px;width:21px;height:21px;border-radius:999px;
   background:rgba(0,0,0,.6);color:#fff;font-family:var(--mono);font-size:10px;
   display:grid;place-items:center}
@@ -657,7 +662,7 @@ var SCHEMA = {
 
 function askGemini(images, model){
   var parts = [{ text: PROMPT }];
-  images.forEach(function(b64){ parts.push({ inline_data: { mime_type: "image/jpeg", data: b64 } }); });
+  images.forEach(function(im){ parts.push({ inline_data: { mime_type: im.mime, data: im.data } }); });
 
   return fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model +
                ":generateContent?key=" + encodeURIComponent(cfg.gkey), {
@@ -726,6 +731,53 @@ function shrink(file, maxDim){
     img.onerror = function(){ URL.revokeObjectURL(url); rej(new Error("I could not open that photo.")); };
     img.src = url;
   });
+}
+
+/* Chrome on Android cannot decode HEIC at all, and an iPhone shoots HEIC by
+   default — so a photo the phone shows you perfectly well can be one the canvas
+   refuses to open. Gemini reads HEIC, WebP and the rest natively, so when the
+   browser cannot resize an image we send the original bytes untouched rather
+   than making the user go and convert it. */
+var GEMINI_TAKES = {
+  "image/jpeg": 1, "image/png": 1, "image/webp": 1, "image/heic": 1, "image/heif": 1
+};
+var EXT_MIME = {
+  jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png", webp:"image/webp",
+  heic:"image/heic", heif:"image/heif"
+};
+
+function mimeOf(file){
+  var t = (file.type || "").toLowerCase();
+  if (GEMINI_TAKES[t]) return t;
+  var m = /\.([a-z0-9]+)$/i.exec(file.name || "");
+  return (m && EXT_MIME[m[1].toLowerCase()]) || "";
+}
+
+function fileB64(file){
+  return new Promise(function(res, rej){
+    var fr = new FileReader();
+    fr.onload = function(){
+      var d = String(fr.result || "");
+      var i = d.indexOf(",");
+      if (i < 0) return rej(new Error("I could not read that photo."));
+      res(d.slice(i + 1));
+    };
+    fr.onerror = function(){ rej(new Error("I could not read that photo.")); };
+    fr.readAsDataURL(file);
+  });
+}
+
+function prepare(file){
+  return shrink(file, 2000)
+    .then(function(b64){ return { mime: "image/jpeg", data: b64 }; })
+    ["catch"](function(err){
+      var mime = mimeOf(file);
+      if (!mime) throw err;                       // nothing sensible to send
+      if (file.size > 6 * 1048576)
+        throw new Error("That photo is " + (file.size / 1048576).toFixed(1) +
+          " MB and this phone cannot shrink it. A screenshot of it will work.");
+      return fileB64(file).then(function(b64){ return { mime: mime, data: b64 }; });
+    });
 }
 
 /* ============================================================
@@ -823,6 +875,12 @@ function renderTray(){
                   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" ' +
                   'stroke-width="3.4" stroke-linecap="round" aria-hidden="true">' +
                   '<path d="M5 5 19 19M19 5 5 19"/></svg></button>';
+    // a HEIC the browser cannot draw still goes to Gemini, so say so rather
+    // than leaving a broken image icon sitting there
+    d.querySelector("img").addEventListener("error", function(){
+      var ext = (/\.([a-z0-9]+)$/i.exec(t.file.name || "") || [,"img"])[1].toUpperCase();
+      this.outerHTML = '<div class="noprev"><b>' + esc(ext) + '</b><span>no preview<br>still readable</span></div>';
+    });
     d.querySelector(".x").addEventListener("click", function(){
       try { URL.revokeObjectURL(t.url); } catch(e){}
       tray.splice(i, 1);
@@ -923,11 +981,11 @@ function cook(files){
   cookLines();
   barTo(10);
 
-  Promise.all(files.map(function(f){ return shrink(f, 2000); }))
+  Promise.all(files.map(prepare))
     .then(function(imgs){
       barTo(26);
       setTimeout(function(){ barTo(88); }, 400);   // the long wait is Gemini thinking
-      var mb = imgs.reduce(function(n, b){ return n + b.length; }, 0) * 0.75 / 1048576;
+      var mb = imgs.reduce(function(n, im){ return n + im.data.length; }, 0) * 0.75 / 1048576;
       if (mb > 14) throw new Error("Those photos come to " + mb.toFixed(1) +
         " MB, which is more than one request can carry. Read them in two goes.");
       return readMenu(imgs);
