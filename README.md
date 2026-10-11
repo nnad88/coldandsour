@@ -43,26 +43,41 @@ Nothing to edit in any file. No account to make with me.
 
 ## Getting it onto the phones
 
-After setup, **⚙ settings** gives you a pairing link that carries all four keys
-inside it. The other phone never repeats the setup.
+Open **⚙ settings** on the device you set up. It shows **one link per person** — they
+are not the same link. Each one already knows whose phone it is, so there is nothing
+to choose at the other end.
 
-**The reliable way, and the one to use if anything goes odd:**
+### iPhone
 
-1. On the phone, open the plain app address in **Safari** (iPhone) or **Chrome**
-   (Android) — no link, no fragment, just `https://…/coldandsour/`.
-2. Make the icon: iPhone **Share → Add to Home Screen**; Android **⋮ → Add to home
-   screen** (or the Install prompt).
-3. Open the app **from the icon**. It shows the setup screen.
-4. Paste the pairing link into the box at the top — *Paste the pairing link here* —
-   and press **Pair this phone**. Pick which of you it is. Done, permanently.
+iOS gives a home-screen icon its own storage, walled off from Safari. That is the one
+thing that makes this fiddly, and there are two ways around it. Either works.
 
-That last step is what makes it stick. iOS gives a home-screen app its own storage,
-walled off from Safari, so anything you paired in Safari is invisible to the icon.
-Pairing from inside the icon puts it in the right place.
+**A — install first, paste second.** The one that always works.
 
-**Add to Home Screen missing from the Share sheet?** You're not in Safari itself.
-Links opened from Messages or WhatsApp run in an in-app browser that can't install
-anything. Tap the compass / *Open in Safari* button first.
+1. In **Safari**, open the plain address: `https://nnad88.github.io/coldandsour/`
+2. **Share → Add to Home Screen.**
+3. Open the app **from the icon**. The setup screen appears.
+4. Paste her link into the yellow box at the top, press **Pair this phone**. Done.
+
+**B — open the link, then install from that page.**
+
+1. Open her link in **Safari** (scan the code in settings with the camera, or tap the
+   link from a message). It says *Paired* straight away.
+2. **Without navigating away**, do **Share → Add to Home Screen** on that exact page.
+   The pairing travels with it.
+3. Open from the icon. It is already paired.
+
+If B does not take — the icon opens on the setup screen — just do A. Nothing is broken
+and nothing is lost.
+
+**No Share option in the menu?** You are not in Safari itself. Links opened from
+WhatsApp or Messages run in an in-app browser that cannot install anything. Tap the
+compass / *Open in Safari* button first.
+
+### Android
+
+Open her link in **Chrome**, then **⋮ → Add to home screen**. Chrome keeps the same
+storage, so it is paired either way round.
 
 ## Try it before any of that
 

@@ -159,6 +159,16 @@ input,textarea{font-family:inherit;font-size:16px}
   background:var(--ink);color:#fff;padding:12px 18px;border-radius:999px;font-size:13.5px;
   font-weight:600;z-index:60;max-width:88vw;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.3)}
 .hide{display:none !important}
+
+/* pairing cards in settings */
+.pcard{border:2px solid var(--hair);border-radius:15px;padding:15px;margin-top:12px;
+  display:flex;flex-direction:column;align-items:center;gap:11px}
+.pname{font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--ink);align-self:flex-start}
+.pcard canvas{width:196px;height:196px;border-radius:7px;display:block}
+.qrmiss{font-family:var(--mono);font-size:10px;color:var(--faint);text-align:center;padding:14px 0}
+.plink{width:100%;background:#16141A;color:#9BE8D0;border-radius:10px;padding:10px;
+  font-family:var(--mono);font-size:9px;line-height:1.45;word-break:break-all;max-height:62px;overflow:auto}
+.pcard .mini{margin-top:0;width:100%}
 </style>
 </head>
 <body>
@@ -168,7 +178,9 @@ input,textarea{font-family:inherit;font-size:16px}
   <div class="top"><span class="brand">cold &amp; sour</span><span class="pill">setup</span></div>
 
   <div class="warn">
-    <b>Paste the pairing link here</b> if you already set up the other phone. Otherwise work through the five steps.
+    <b>Already set it up somewhere else?</b> Paste <b>your own</b> pairing link here — the one
+    with your name on it, from ⚙ settings. That is all this phone needs; everything below is
+    only for the very first device.
     <input id="pairIn" placeholder="https://…/#p=…" autocomplete="off" autocapitalize="off" spellcheck="false"
       style="width:100%;margin-top:10px;background:rgba(255,255,255,.14);border:1.5px solid rgba(255,255,255,.3);border-radius:11px;padding:12px;color:#fff;font-weight:500">
     <button class="mini" id="pairGo" style="background:#fff;color:#16141A">Pair this phone</button>
@@ -229,6 +241,7 @@ input,textarea{font-family:inherit;font-size:16px}
     <button class="pill tap" id="gearBtn">⚙ settings</button>
   </div>
 
+  <div class="warn hide" id="installTip"></div>
   <div id="homeCards"></div>
 
   <div class="hero">
@@ -335,11 +348,11 @@ input,textarea{font-family:inherit;font-size:16px}
   <div class="top"><button class="pill tap" id="setBack">← back</button><span class="pill">settings</span></div>
 
   <div class="sheet">
-    <h3>Pair the other phone</h3>
-    <p>Open this link on the other phone, or copy it and paste it into the box at the very top there.
-       The keys travel inside it, so nothing has to be set up twice.</p>
-    <div class="code" id="pairLink" style="white-space:pre-wrap;word-break:break-all">—</div>
-    <button class="mini" id="pairCopy">Copy the link</button>
+    <h3>Pair the phones</h3>
+    <p><b>One link each</b> — they are not the same. The link already knows which of you
+       it belongs to, so that phone is named and ready the moment it opens. Point the
+       phone's camera at the code, or copy the link and send it over.</p>
+    <div id="pairCards"></div>
   </div>
 
   <div class="sheet">
@@ -1207,18 +1220,24 @@ $("setupGo").addEventListener("click", function(){
   if (!a || !b)        return bad("Both names are missing.");
   if (pickedWho === null) return bad("Tell me who is holding this phone.");
 
-  saveCfg({ url:url, key:key, gkey:gk, pair:rndId(10), names:[a, b], me:pickedWho });
+  // keep the pair code when this phone already adopted one. Minting a fresh one
+  // here silently unpairs the device from the other phone, which is very hard to spot.
+  var keep = loadCfg();
+  saveCfg({ url:url, key:key, gkey:gk,
+            pair: (keep && keep.pair) ? keep.pair : rndId(10),
+            names:[a, b], me:pickedWho });
   boot();
 });
 
-/* pairing link */
-function pairPayload(){
+/* pairing links — one per person, with their identity baked in, so the
+   phone that opens it has nothing left to choose */
+function pairPayload(who){
   return btoa(unescape(encodeURIComponent(JSON.stringify({
-    u: cfg.url, k: cfg.key, g: cfg.gkey, p: cfg.pair, n: cfg.names
+    u: cfg.url, k: cfg.key, g: cfg.gkey, p: cfg.pair, n: cfg.names, m: who
   })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
-function pairLink(){
-  return location.href.split("#")[0] + "#p=" + pairPayload();
+function pairLink(who){
+  return location.href.split("#")[0].split("?")[0] + "#p=" + pairPayload(who);
 }
 function readPair(frag){
   var m = /[#&]p=([A-Za-z0-9\-_]+)/.exec(frag || "");
@@ -1232,9 +1251,17 @@ function readPair(frag){
   return null;
 }
 
-function adoptPair(o){
+function adoptPair(o, inBrowser){
+  // a link that already says who this phone belongs to: nothing left to ask
+  if (o.m === 0 || o.m === 1){
+    saveCfg({ url:o.u, key:o.k, gkey:o.g || "", pair:o.p, names:o.n, me:o.m });
+    show("home");
+    if (inBrowser) installHint();
+    else toast("Paired — this is " + o.n[o.m] + "'s phone");
+    return;
+  }
   saveCfg({ url:o.u, key:o.k, gkey:o.g || "", pair:o.p, names:o.n, me:null });
-  // who is holding this phone?
+  // an older link with no name in it: ask which of them is holding the phone
   $("sbUrl").value = o.u; $("sbKey").value = o.k; $("gKey").value = o.g || "";
   $("nmA").value = o.n[0]; $("nmB").value = o.n[1];
   refreshWhoLabels();
@@ -1250,11 +1277,75 @@ $("pairGo").addEventListener("click", function(){
   adoptPair(o);
 });
 
+/* Paired, but still in a browser tab rather than from the home-screen icon.
+   Installing from THIS page is what carries the pairing across on iOS. */
+function installHint(){
+  var ios = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var el = $("installTip");
+  el.innerHTML = ios
+    ? '<b>Paired.</b> Now install it from <i>this</i> page, so the icon keeps the pairing: ' +
+      'tap <b>Share</b> at the bottom of Safari, then <b>Add to Home Screen</b>. ' +
+      'After that, always open it from the icon.'
+    : '<b>Paired.</b> Now add it to your home screen from this page: <b>⋮ → Add to home screen</b>, ' +
+      'then open it from the icon.';
+  var b = document.createElement("button");
+  b.className = "mini";
+  b.style.background = "#fff"; b.style.color = "#16141A";
+  b.textContent = "Got it";
+  b.addEventListener("click", function(){ el.classList.add("hide"); });
+  el.appendChild(b);
+  el.classList.remove("hide");
+}
+
 /* ============================================================
    settings
    ============================================================ */
+/* the QR encoder is only ever needed on the settings screen, so it is fetched
+   the first time that screen opens, and the links still work without it */
+function withQR(cb){
+  if (window.QRCode) return cb(true);
+  var s = document.createElement("script");
+  s.src = "https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js";
+  s.onload = function(){ cb(!!window.QRCode); };
+  s.onerror = function(){ cb(false); };
+  document.head.appendChild(s);
+}
+
+function renderPairCards(){
+  var box = $("pairCards");
+  box.innerHTML = "";
+  [0, 1].forEach(function(who){
+    var link = pairLink(who);
+    var card = document.createElement("div");
+    card.className = "pcard";
+    card.innerHTML =
+      '<div class="pname">' + esc(cfg.names[who]) + "'s phone" +
+        (who === cfg.me ? ' <span style="color:var(--faint);font-weight:500">· this one</span>' : '') +
+      '</div>' +
+      '<canvas class="qr"></canvas>' +
+      '<div class="plink">' + esc(link) + '</div>' +
+      '<button class="mini" type="button">Copy ' + esc(cfg.names[who]) + "'s link</button>";
+    card.querySelector("button").addEventListener("click", function(){
+      copy(link, cfg.names[who] + "'s link copied");
+    });
+    box.appendChild(card);
+
+    withQR(function(ok){
+      var cv = card.querySelector("canvas");
+      if (!ok || !cv){ if (cv) cv.outerHTML = '<div class="qrmiss">(no code — use the link below)</div>'; return; }
+      window.QRCode.toCanvas(cv, link, {
+        width: 196, margin: 1, errorCorrectionLevel: "L",
+        color: { dark: "#16141A", light: "#ffffff" }
+      }, function(err){
+        if (err) cv.outerHTML = '<div class="qrmiss">(no code — use the link below)</div>';
+      });
+    });
+  });
+}
+
 $("gearBtn").addEventListener("click", function(){
-  $("pairLink").textContent = pairLink();
+  renderPairCards();
   $("gKey2").value = cfg.gkey || "";
   var btns = $("whoPick2").querySelectorAll("button");
   btns[0].textContent = cfg.names[0]; btns[1].textContent = cfg.names[1];
@@ -1263,7 +1354,6 @@ $("gearBtn").addEventListener("click", function(){
   show("set");
 });
 $("setBack").addEventListener("click", function(){ show("home"); });
-$("pairCopy").addEventListener("click", function(){ copy(pairLink(), "Link copied"); });
 
 var who2 = null;
 wireWho("whoPick2", function(i){ who2 = i; });
@@ -1294,13 +1384,22 @@ function boot(){
     return;
   }
 
+  // iOS gives a home-screen app its own storage, walled off from Safari, so a phone
+  // paired in Safari opens the icon knowing nothing. Leaving the pairing hash in the
+  // address bar lets Add to Home Screen capture it, and the icon pairs itself on first
+  // open. Once we ARE the icon, the keys come out of the address bar.
+  var standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
+                   navigator.standalone === true;
+
   var incoming = readPair(location.hash);
-  if (incoming && (!cfg || cfg.pair !== incoming.p)){
-    history.replaceState(null, "", location.pathname + location.search);
-    adoptPair(incoming);
+  // opening the other person's link on this phone also corrects who it thinks it is
+  if (incoming && (!cfg || cfg.pair !== incoming.p ||
+                   (typeof incoming.m === "number" && cfg.me !== incoming.m))){
+    if (standalone) history.replaceState(null, "", location.pathname + location.search);
+    adoptPair(incoming, !standalone);
     return;
   }
-  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  if (location.hash && standalone) history.replaceState(null, "", location.pathname + location.search);
 
   if (!cfg || cfg.me === null || cfg.me === undefined){
     if (cfg){ // paired but nobody said who
@@ -1313,6 +1412,12 @@ function boot(){
   }
   show("home");
 }
+
+// a pairing link pasted into the address bar while the app is already open only
+// changes the hash, which reloads nothing — pick it up by hand
+window.addEventListener("hashchange", function(){
+  if (readPair(location.hash)) boot();
+});
 
 if ("serviceWorker" in navigator){
   window.addEventListener("load", function(){

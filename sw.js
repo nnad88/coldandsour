@@ -1,6 +1,6 @@
 // Cache the app shell so the home-screen icon opens instantly and works offline.
 // Supabase and Gemini calls are never cached — they always go to the network.
-const CACHE = "coldandsour-v1";
+const CACHE = "coldandsour-v2";
 const SHELL = [
   "./index.html",
   "./manifest.webmanifest",
