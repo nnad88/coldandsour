@@ -44,6 +44,9 @@ input,textarea{font-family:inherit;font-size:16px}
 .scr{display:none;min-height:100vh;min-height:100dvh;flex-direction:column;
   padding:calc(env(safe-area-inset-top,0px) + 18px) 18px calc(var(--pad) + 16px)}
 .scr.on{display:flex}
+/* the one screen that is exactly the viewport and never scrolls — the buttons
+   have to be under your thumb, not below the fold */
+#s-deck{height:100vh;height:100dvh;overflow:hidden}
 
 /* ---------- chrome ---------- */
 .top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 4px 12px;flex:none}
@@ -97,12 +100,11 @@ input,textarea{font-family:inherit;font-size:16px}
 .shoot{margin-top:30px;width:116px;height:116px;border-radius:999px;background:#fff;
   display:grid;place-items:center;box-shadow:0 14px 34px rgba(120,10,40,.32)}
 .shoot:active{transform:scale(.96)}
-.pick{margin-top:18px;display:inline-flex;align-items:center;gap:8px;
-  background:rgba(0,0,0,.2);color:#fff;border-radius:999px;padding:12px 20px;
-  font-size:14px;font-weight:600;letter-spacing:-.005em}
-.pick:active{transform:translateY(1px)}
-.pick svg{opacity:.85}
-.card-note{background:rgba(0,0,0,.24);border-radius:18px;padding:16px;margin-bottom:10px;text-align:left}
+.card-note{position:relative;background:rgba(0,0,0,.24);border-radius:18px;padding:16px;
+  margin-bottom:10px;text-align:left}
+.toss{position:absolute;right:9px;top:9px;width:30px;height:30px;border-radius:999px;
+  background:rgba(0,0,0,.3);display:grid;place-items:center;padding:0}
+.toss:active{transform:scale(.9)}
 .card-note .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#FFE168}
 .card-note h4{margin:7px 0 2px;font-size:17px;font-weight:700;letter-spacing:-.015em}
 .card-note p{margin:0 0 12px;font-size:13px;line-height:1.45;font-weight:500;color:rgba(255,255,255,.8)}
@@ -142,26 +144,30 @@ input,textarea{font-family:inherit;font-size:16px}
 @keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
 
 /* ---------- deck ---------- */
-.deck{flex:1;position:relative;margin:2px 2px 0;min-height:340px}
-.swipe{position:absolute;left:0;right:0;top:0;bottom:30px;background:#fff;color:var(--ink);border-radius:24px;
-  box-shadow:0 18px 44px rgba(120,10,40,.34);padding:28px 24px 24px;display:flex;flex-direction:column;
-  overflow:hidden;touch-action:none;will-change:transform}
+.deck{flex:1;position:relative;margin:2px 2px 0;min-height:0}
+/* cards sit in a centring slot so the card itself can hug its content; a one-line
+   tapa no longer gets a card the height of the phone with nothing in it */
+.slot{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.swipe{position:relative;width:100%;min-height:270px;max-height:100%;background:#fff;color:var(--ink);
+  border-radius:24px;box-shadow:0 18px 44px rgba(120,10,40,.34);padding:26px 24px 22px;
+  display:flex;flex-direction:column;overflow:hidden;touch-action:none;will-change:transform;
+  pointer-events:auto}
 .swipe .sec{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--red)}
-.swipe h2{margin:13px 0 0;font-size:36px;line-height:.98;font-weight:800;letter-spacing:-.03em;text-wrap:balance}
+.swipe h2{margin:11px 0 0;font-size:34px;line-height:.99;font-weight:800;letter-spacing:-.03em;text-wrap:balance}
 .swipe h2.sm{font-size:28px}
 .swipe h2.xs{font-size:23px;line-height:1.06}
-.swipe .desc{margin:14px 0 0;font-size:14.5px;line-height:1.5;color:var(--mut);font-weight:500;
+.swipe .desc{margin:12px 0 0;font-size:14.5px;line-height:1.48;color:var(--mut);font-weight:500;
   overflow:hidden;flex-shrink:1}
 .swipe .bot{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
-  border-top:1.5px solid var(--hair);padding-top:15px;margin-top:14px}
+  border-top:1.5px solid var(--hair);padding-top:13px;margin-top:16px}
 .swipe .price{font-size:28px;font-weight:800;letter-spacing:-.02em}
 .swipe .of{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
 .stamp{position:absolute;top:34px;padding:4px 13px 7px;border-radius:10px;border:5px solid;
   font-size:30px;font-weight:800;letter-spacing:.02em;opacity:0;pointer-events:none}
 .stamp.yes{left:22px;transform:rotate(-16deg);border-color:var(--green);color:var(--green)}
 .stamp.no{right:22px;transform:rotate(16deg);border-color:var(--red);color:var(--red)}
-.under{position:absolute;left:0;right:0;top:0;bottom:30px;background:#fff;border-radius:24px;opacity:.34}
-.acts{display:flex;align-items:center;justify-content:center;gap:22px;padding-top:18px;flex:none}
+.under{position:relative;width:100%;background:#fff;border-radius:24px;opacity:.34}
+.acts{display:flex;align-items:center;justify-content:center;gap:22px;padding-top:16px;flex:none}
 .rnd{width:66px;height:66px;border-radius:999px;background:#fff;display:grid;place-items:center;
   box-shadow:0 8px 20px rgba(120,10,40,.26)}
 .rnd:active{transform:scale(.92)}
@@ -278,7 +284,7 @@ input,textarea{font-family:inherit;font-size:16px}
 
   <div class="hero">
     <h1>What the <em>hell</em><br>do we order?</h1>
-    <p>Photograph the menu, or pick a screenshot from your photos. I turn it into cards you can swipe.</p>
+    <p>Shoot the menu or pick a screenshot. I turn it into cards you can swipe.</p>
     <button class="shoot" id="shootBtn" aria-label="Photograph the menu">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#16141A" stroke-width="1.9"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -286,20 +292,11 @@ input,textarea{font-family:inherit;font-size:16px}
         <circle cx="12" cy="12.5" r="3.6"/>
       </svg>
     </button>
-    <button class="pick" id="pickBtn">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="3" y="4.5" width="18" height="15" rx="2.5"/>
-        <circle cx="8.5" cy="10" r="1.6"/>
-        <path d="m4 17 4.8-4.4a1.6 1.6 0 0 1 2.2 0L15 16m0 0 1.6-1.5a1.6 1.6 0 0 1 2.2 0L20 16"/>
-      </svg>
-      Choose from photos
-    </button>
     <!-- two inputs on purpose: capture="environment" opens the camera and hides the
          gallery entirely, so a saved screenshot needs an input without it -->
-    <input type="file" id="shootIn" accept="image/*" capture="environment" multiple class="hide">
-    <!-- a wildcard accept makes Android re-offer the camera, which the big button
-         above already covers; naming the types sends it to the gallery instead -->
+    <!-- One input, no capture attribute. HTML cannot stop Android putting Camera in
+         the picker, so rather than two buttons that both reach a camera there is one
+         button and the system sheet offers camera or gallery. -->
     <input type="file" id="pickIn" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif,application/pdf" multiple class="hide">
   </div>
 
@@ -316,8 +313,7 @@ input,textarea{font-family:inherit;font-size:16px}
      They are read together, in this order.</p>
   <div class="thumbs" id="thumbs"></div>
   <div class="trayAdd">
-    <button class="ghost" id="trayShoot">Take another</button>
-    <button class="ghost" id="trayPick">From photos</button>
+    <button class="ghost" id="trayPick">Add another page</button>
   </div>
   <button class="big" id="trayGo" style="margin-top:10px">Read the menu</button>
   <p class="foot" id="trayFoot">—</p>
@@ -568,6 +564,13 @@ function putBallot(roundId, votes, done){
   });
 }
 
+function dropRound(id){
+  if (DEMO) return Promise.resolve(fake.drop(id));
+  // ballots first: a round with orphaned votes would come back looking half-played
+  return sb("ballots?round_id=eq." + encodeURIComponent(id), { method: "DELETE" })
+    .then(function(){ return sb("rounds?id=eq." + encodeURIComponent(id), { method: "DELETE" }); });
+}
+
 /* the demo's backend: localStorage, plus a partner who swipes at random */
 var fake = (function(){
   var K = "cas.demo";
@@ -587,6 +590,12 @@ var fake = (function(){
       put(s); return row;
     },
     ballots: function(id){ return all().b.filter(function(b){ return b.round_id === id; }); },
+    drop: function(id){
+      var st = all();
+      st.r = st.r.filter(function(r){ return r.id !== id; });
+      st.b = st.b.filter(function(b){ return b.round_id !== id; });
+      put(st); return null;
+    },
     ballotsFor: function(ids){ return all().b.filter(function(b){ return ids.indexOf(b.round_id) >= 0; }); },
     putBallot: function(id, voter, votes, done){
       var s = all(), hit = null;
@@ -725,6 +734,22 @@ var SCHEMA = {
   required: ["place", "dishes"]
 };
 
+/* Reading a menu is transcription, not reasoning, but the 3.x models think
+   before answering by default and that is where the minutes went. Asking for no
+   thinking budget takes a 3-4 minute read down to seconds. Older models reject
+   the field, so the first 400 that complains about it turns this off and retries. */
+var noThink = true;
+function cfg_gen(){
+  var g = {
+    temperature: 0.2,
+    responseMimeType: "application/json",
+    responseSchema: SCHEMA,
+    maxOutputTokens: 8192
+  };
+  if (noThink) g.thinkingConfig = { thinkingBudget: 0 };
+  return g;
+}
+
 function askGemini(images, model){
   var parts = [{ text: PROMPT }];
   images.forEach(function(im){ parts.push({ inline_data: { mime_type: im.mime, data: im.data } }); });
@@ -743,7 +768,7 @@ function askGemini(images, model){
     signal: ctrl ? ctrl.signal : undefined,
     body: JSON.stringify({
       contents: [{ parts: parts }],
-      generationConfig: { temperature: 0.2, responseMimeType: "application/json", responseSchema: SCHEMA }
+      generationConfig: cfg_gen()
     })
   })["catch"](function(e){
     clearTimeout(bell);
@@ -784,10 +809,21 @@ function readMenu(images){
     tried[model] = 1;
     cookWatch(images.length);
     return askGemini(images, model)
-      .then(function(out){ rememberModel(model); return out; })
+      .then(function(out){
+        rememberModel(model);
+        notePace((Date.now() - watchT0) / 1000, images.length);
+        return out;
+      })
       ["catch"](function(err){
         var msg = String(err && err.message || err);
         var st = err.status;
+
+        // this model does not know thinkingConfig: drop it and try once more
+        if (noThink && st === 400 && /thinking|thinkingBudget|thinking_budget|Unknown name/i.test(msg)){
+          noThink = false;
+          delete tried[model];
+          return attempt(model);
+        }
 
         // the model name is dead: take the replacement it names, else go looking
         if (st === 404 || /not_found|no longer available|is not supported/i.test(msg)){
@@ -818,7 +854,13 @@ function readMenu(images){
       });
   }
 
-  return attempt(savedModel() || DEFAULT_MODEL);
+  var start = savedModel();
+  if (start) return attempt(start);
+  // first run: one cheap catalogue call buys the fastest model this key can use
+  // (flash-lite before flash), instead of guessing a name and paying for it later
+  return modelList().then(function(list){
+    return attempt(list[0] || DEFAULT_MODEL);
+  });
 }
 
 /* the bar must not look frozen while we wait out a demand spike */
@@ -847,7 +889,8 @@ function shrink(file, maxDim){
       // A phone screenshot is long and narrow, so capping the LONG side alone
       // crushes the short one — a 1170x2532 screenshot came out 739px wide, which
       // is not enough to read a dense menu. Never take the short side below this.
-      if (Math.min(w, h) * s < 1000) s = Math.min(1, 1000 / Math.min(w, h));
+      // 900 keeps small print legible while costing the model far fewer tiles.
+      if (Math.min(w, h) * s < 900) s = Math.min(1, 900 / Math.min(w, h));
       var cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
       var cv = document.createElement("canvas");
       cv.width = cw; cv.height = ch;
@@ -942,7 +985,7 @@ function fileB64(file){
 
 function prepare(file){
   // resizing is only an optimisation; what matters is that Gemini gets the bytes
-  return shrink(file, 2000)
+  return shrink(file, 1800)
     .then(function(b64){ return { mime: "image/jpeg", data: b64 }; })
     ["catch"](function(err){
       return sniff(file).then(function(real){
@@ -1008,18 +1051,36 @@ function cookLines(){
 /* Gemini can take half a minute over a stack of photos. Jokes for the first
    stretch, then the plain count of seconds, and a bar that keeps inching —
    a number that has not moved in 40s reads as broken even when it is fine. */
+var PACE_KEY = "cas.pace";
+function pace(){                      // seconds a read usually takes, per photo
+  var v = 0;
+  try { v = parseFloat(localStorage.getItem(PACE_KEY)) || 0; } catch(e){}
+  return v > 1 ? v : 12;
+}
+function notePace(secs, n){
+  var per = Math.max(2, secs / Math.max(1, n));
+  // drift toward what this phone and key actually do, rather than a fixed guess
+  try { localStorage.setItem(PACE_KEY, (pace() * 0.6 + per * 0.4).toFixed(1)); } catch(e){}
+}
+
+var watchT0 = 0;
 function cookWatch(n){
   clearInterval(cookT);
-  var t0 = Date.now();
+  watchT0 = Date.now();
+  // The bar used to reach 90% in a second and then spend a minute on the last
+  // ten, which is a lie about where the time goes: almost all of it is this one
+  // call. So the whole 6-96 stretch belongs to it, easing out on a curve scaled
+  // by how long reads have actually been taking, and never quite arriving.
+  var expect = Math.max(6, pace() * n);
   function tick(){
-    var sec = Math.floor((Date.now() - t0) / 1000);
+    var sec = (Date.now() - watchT0) / 1000;
     $("cookStep").textContent = sec < 14
       ? COOK_LINES[Math.floor(sec / 2) % COOK_LINES.length]
-      : "Still reading " + n + (n === 1 ? " photo" : " photos") + " — " + sec + "s";
-    barTo(Math.min(97, 88 + sec * 0.22));
+      : "Still reading " + n + (n === 1 ? " photo" : " photos") + " — " + Math.floor(sec) + "s";
+    barTo(6 + 90 * (1 - Math.exp(-sec / expect)));
   }
   tick();
-  cookT = setInterval(tick, 1000);
+  cookT = setInterval(tick, 500);
 }
 
 /* ============================================================
@@ -1106,7 +1167,6 @@ function took(e){
 }
 
 $("trayBack").addEventListener("click", function(){ clearTray(); show("home"); });
-$("trayShoot").addEventListener("click", function(){ $("shootIn").click(); });
 $("trayPick").addEventListener("click", function(){ $("pickIn").click(); });
 $("trayGo").addEventListener("click", function(){
   if (!tray.length) return;
@@ -1117,13 +1177,8 @@ $("trayGo").addEventListener("click", function(){
 
 $("shootBtn").addEventListener("click", function(){
   if (DEMO) return cookDemo();
-  $("shootIn").click();
-});
-$("pickBtn").addEventListener("click", function(){
-  if (DEMO) return cookDemo();
   $("pickIn").click();
 });
-$("shootIn").addEventListener("change", took);
 $("pickIn").addEventListener("change", took);
 
 // on a laptop the menu is usually already on the clipboard
@@ -1181,12 +1236,11 @@ function cook(files){
   $("cookPill").textContent = files.length > 1 ? files.length + " photos" : "1 photo";
   barStart($("cookBar"), $("cookPct"));
   cookLines();
-  barTo(10);
+  barTo(4);
 
   Promise.all(files.map(prepare))
     .then(function(imgs){
-      barTo(26);
-      setTimeout(function(){ barTo(88); }, 400);   // the long wait is Gemini thinking
+      barTo(6);     // resizing is the fast part; cookWatch owns the rest
       var mb = imgs.reduce(function(n, im){ return n + im.data.length; }, 0) * 0.75 / 1048576;
       if (mb > 14) throw new Error("Those photos come to " + mb.toFixed(1) +
         " MB, which is more than one request can carry. Read them in two goes.");
@@ -1195,7 +1249,7 @@ function cook(files){
     .then(function(out){
       var dishes = (out.dishes || []).filter(function(d){ return d && d.name && String(d.name).trim(); });
       if (!dishes.length) throw new Error("I could not find any dishes in that photo. Try more light, closer in, or the menu flatter.");
-      barTo(94);
+      barTo(97);
       var row = {
         id: rndId(6),
         pair: cfg.pair,
@@ -1253,7 +1307,10 @@ function openGo(row){
   $("goPill").textContent = row.id;
   show("go");
 }
-$("goBack").addEventListener("click", function(){ show("home"); });
+$("goBack").addEventListener("click", function(){
+  if (round) skipRound(round.id);
+  show("home");
+});
 $("goBtn").addEventListener("click", function(){ startDeck(round); });
 
 /* ============================================================
@@ -1286,13 +1343,10 @@ function sizeClass(name){
 }
 
 function cardHTML(d, n, total){
-  // the two spacers float the dish a little above centre, so a one-line tapa
-  // doesn't sit marooned at the top of a tall white card
-  return '<div style="flex:0.85 1 0"></div>' +
-         '<span class="sec">' + esc(d.section || "dish " + n) + '</span>' +
+  return '<span class="sec">' + esc(d.section || "dish " + n) + '</span>' +
          '<h2 class="' + sizeClass(d.name) + '">' + esc(d.name) + '</h2>' +
          (d.note ? '<p class="desc">' + esc(d.note) + '</p>' : '') +
-         '<div style="flex:1.15 1 0"></div>' +
+         '<div style="flex:1 1 0;min-height:16px"></div>' +
          '<div class="bot"><span class="price">' + esc(d.price || "—") + '</span>' +
          '<span class="of">' + n + ' of ' + total + '</span></div>' +
          '<div class="stamp yes">YES</div><div class="stamp no">NOPE</div>';
@@ -1305,8 +1359,13 @@ function renderDeck(){
 
   for (var k = Math.min(idx + 2, total - 1); k >= idx; k--){
     var d = round.dishes[k];
-    var el = document.createElement("div");
     var depth = k - idx;
+    // every card lives in a slot that centres it, so dragging can own the card's
+    // own transform without fighting the layout
+    var slot = document.createElement("div");
+    slot.className = "slot";
+    var el = document.createElement("div");
+
     if (depth === 0){
       el.className = "swipe";
       el.innerHTML = cardHTML(d, k + 1, total);
@@ -1314,10 +1373,19 @@ function renderDeck(){
     } else {
       // narrower and pushed down, so the stack peeks out under the live card
       el.className = "under";
-      el.style.transform = "scale(" + (1 - depth * 0.045) + ") translateY(" + (depth * 26) + "px)";
+      el.style.transform = "scale(" + (1 - depth * 0.045) + ") translateY(" + (depth * 22) + "px)";
       el.style.opacity = depth === 1 ? "0.58" : "0.3";
     }
-    box.appendChild(el);
+    slot.appendChild(el);
+    box.appendChild(slot);
+  }
+
+  // the stack behind should be the same card, not a taller one: match the live
+  // card's height once it has laid out
+  var live = box.querySelector(".swipe");
+  if (live){
+    var hgt = live.offsetHeight;
+    [].slice.call(box.querySelectorAll(".under")).forEach(function(u){ u.style.height = hgt + "px"; });
   }
 
   $("deckCount").textContent = idx + " / " + total;
@@ -1541,13 +1609,27 @@ function pollHome(){
   pollT = setInterval(function(){ if (!document.hidden) tick(); }, 5000);
 }
 
+/* rounds this phone has chosen not to be nagged about again */
+var SKIP_KEY = "cas.skip";
+function skipped(){
+  try { var v = JSON.parse(localStorage.getItem(SKIP_KEY) || "[]"); return v.length ? v : []; }
+  catch(e){ return []; }
+}
+function skipRound(id){
+  var l = skipped();
+  if (l.indexOf(id) < 0) l.push(id);
+  try { localStorage.setItem(SKIP_KEY, JSON.stringify(l.slice(-40))); } catch(e){}
+}
+
 function paint(rows, ballots){
   var fresh = Date.now() - 1000 * 60 * 60 * 5;   // anything older than 5h is yesterday's dinner
-  var h = "", shown = 0;
+  var hot   = Date.now() - 1000 * 60 * 10;       // scanned just now, by the other phone
+  var h = "", shown = 0, jump = null, skip = skipped();
 
   rows.forEach(function(r){
     if (shown >= 2) return;
     if (new Date(r.created_at).getTime() < fresh) return;
+    if (skip.indexOf(r.id) >= 0) return;
 
     var mine = null, them = null;
     ballots.forEach(function(b){
@@ -1574,9 +1656,15 @@ function paint(rows, ballots){
       kicker = r.shot_by === meId() ? "your menu" : themName() + " scanned a menu";
       title = where;
       line = total + " dishes waiting."; label = "GO";
+      if (r.shot_by !== meId() && new Date(r.created_at).getTime() > hot) jump = r;
     }
 
     h += '<div class="card-note" data-id="' + esc(r.id) + '">' +
+         '<button class="toss" type="button" data-toss="' + esc(r.id) + '" ' +
+            'aria-label="Discard this menu">' +
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" ' +
+            'stroke-width="3" stroke-linecap="round" aria-hidden="true">' +
+            '<path d="M5 5 19 19M19 5 5 19"/></svg></button>' +
          '<div class="k">' + esc(kicker) + '</div>' +
          '<h4>' + esc(title) + '</h4>' +
          '<p>' + esc(line) + '</p>' +
@@ -1585,11 +1673,30 @@ function paint(rows, ballots){
     shown++;
   });
 
+  // When one of us finishes scanning, the other should not have to notice a card:
+  // a round they have not touched, shot by the other phone in the last ten minutes,
+  // takes them straight to GO. Saying "Not now" settles it for good.
+  if (cur === "home" && jump && !DEMO){
+    round = jump;
+    openGo(jump);
+    return;
+  }
+
   var box = $("homeCards");
   if (box.innerHTML !== h){
     box.innerHTML = h;
     [].slice.call(box.querySelectorAll("[data-open]")).forEach(function(btn){
       btn.addEventListener("click", function(){ openRound(btn.getAttribute("data-open")); });
+    });
+    [].slice.call(box.querySelectorAll("[data-toss]")).forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var id = btn.getAttribute("data-toss");
+        if (!confirm("Throw this menu away? It goes for both of you.")) return;
+        skipRound(id);                       // so the poll cannot re-open it
+        btn.closest(".card-note").remove();
+        dropRound(id).then(function(){ toast("Gone"); })
+          ["catch"](function(){ toast("Could not delete it — it may come back."); });
+      });
     });
   }
 }
