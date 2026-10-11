@@ -1,6 +1,11 @@
 // Cache the app shell so the home-screen icon opens instantly and works offline.
 // Supabase and Gemini calls are never cached — they always go to the network.
-const CACHE = "coldandsour-v3";
+const CACHE = "coldandsour-v4";
+// caches.keys() lists every cache on the ORIGIN, not just this worker's scope, and
+// nnad88.github.io hosts other apps of mine. Sweeping "everything that isn't mine"
+// would delete theirs — and they would delete this one right back, which leaves the
+// shell missing exactly when Chrome checks whether the app works offline.
+const MINE = "coldandsour-";
 const SHELL = [
   "./index.html",
   "./manifest.webmanifest",
@@ -22,7 +27,9 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(
+        keys.filter((k) => k.startsWith(MINE) && k !== CACHE).map((k) => caches.delete(k))
+      ))
       .then(() => self.clients.claim())
   );
 });
