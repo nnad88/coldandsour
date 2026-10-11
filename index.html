@@ -278,7 +278,7 @@ input,textarea{font-family:inherit;font-size:16px}
 
   <div class="hero">
     <h1>What the <em>hell</em><br>do we order?</h1>
-    <p>Photograph the menu, or upload a screenshot of one. I turn it into cards you can swipe.</p>
+    <p>Photograph the menu, or pick a screenshot from your photos. I turn it into cards you can swipe.</p>
     <button class="shoot" id="shootBtn" aria-label="Photograph the menu">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#16141A" stroke-width="1.9"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -293,12 +293,14 @@ input,textarea{font-family:inherit;font-size:16px}
         <circle cx="8.5" cy="10" r="1.6"/>
         <path d="m4 17 4.8-4.4a1.6 1.6 0 0 1 2.2 0L15 16m0 0 1.6-1.5a1.6 1.6 0 0 1 2.2 0L20 16"/>
       </svg>
-      Upload a screenshot
+      Choose from photos
     </button>
     <!-- two inputs on purpose: capture="environment" opens the camera and hides the
          gallery entirely, so a saved screenshot needs an input without it -->
     <input type="file" id="shootIn" accept="image/*" capture="environment" multiple class="hide">
-    <input type="file" id="pickIn" accept="image/*,application/pdf" multiple class="hide">
+    <!-- a wildcard accept makes Android re-offer the camera, which the big button
+         above already covers; naming the types sends it to the gallery instead -->
+    <input type="file" id="pickIn" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif,application/pdf" multiple class="hide">
   </div>
 
   <p class="foot" id="homeFoot">You are —</p>
@@ -315,7 +317,7 @@ input,textarea{font-family:inherit;font-size:16px}
   <div class="thumbs" id="thumbs"></div>
   <div class="trayAdd">
     <button class="ghost" id="trayShoot">Take another</button>
-    <button class="ghost" id="trayPick">Upload</button>
+    <button class="ghost" id="trayPick">From photos</button>
   </div>
   <button class="big" id="trayGo" style="margin-top:10px">Read the menu</button>
   <p class="foot" id="trayFoot">—</p>
@@ -727,20 +729,38 @@ function askGemini(images, model){
   var parts = [{ text: PROMPT }];
   images.forEach(function(im){ parts.push({ inline_data: { mime_type: im.mime, data: im.data } }); });
 
+  // a stalled request would otherwise sit at 88% forever; give it a deadline
+  // that scales with how much we are asking it to read
+  var limit = Math.min(150000, 45000 + images.length * 15000);
+  var ctrl = (typeof AbortController === "function") ? new AbortController() : null;
+  var bell = setTimeout(function(){ if (ctrl) ctrl.abort(); }, limit);
+  function done(v){ clearTimeout(bell); return v; }
+
   return fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model +
                ":generateContent?key=" + encodeURIComponent(cfg.gkey), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    signal: ctrl ? ctrl.signal : undefined,
     body: JSON.stringify({
       contents: [{ parts: parts }],
       generationConfig: { temperature: 0.2, responseMimeType: "application/json", responseSchema: SCHEMA }
     })
+  })["catch"](function(e){
+    clearTimeout(bell);
+    if (e && (e.name === "AbortError" || /abort/i.test(String(e.message || "")))){
+      var t = new Error("No answer in " + Math.round(limit / 1000) + "s — the request stalled.");
+      t.status = 504;
+      throw t;
+    }
+    throw e;
   }).then(function(r){
     return r.text().then(function(t){
+      clearTimeout(bell);
       if (!r.ok){ var e = new Error(t || ("HTTP " + r.status)); e.status = r.status; throw e; }
       return JSON.parse(t);
     });
   }).then(function(j){
+    done();
     var c = j && j.candidates && j.candidates[0];
     var txt = c && c.content && c.content.parts && c.content.parts[0] && c.content.parts[0].text;
     if (!txt) throw new Error("Gemini returned nothing readable.");
@@ -762,6 +782,7 @@ function readMenu(images){
 
   function attempt(model){
     tried[model] = 1;
+    cookWatch(images.length);
     return askGemini(images, model)
       .then(function(out){ rememberModel(model); return out; })
       ["catch"](function(err){
@@ -777,8 +798,8 @@ function readMenu(images){
 
         // Google is overloaded, or we are going too fast. Neither is fatal:
         // wait a little, then try again, then try a different model.
-        var busy = st === 503 || st === 500 ||
-                   /UNAVAILABLE|high demand|overloaded|try again later/i.test(msg);
+        var busy = st === 503 || st === 500 || st === 504 ||
+                   /UNAVAILABLE|high demand|overloaded|try again later|stalled/i.test(msg);
         var paced = st === 429 && !/per day|daily|quota.*exceeded.*day/i.test(msg);
         if (busy || paced){
           if (waited < WAITS.length){
@@ -810,7 +831,7 @@ function countdown(label, ms){
   }
   tick();
   var h = setInterval(tick, 250);
-  return sleep(ms).then(function(){ clearInterval(h); cookLines(); });
+  return sleep(ms).then(function(){ clearInterval(h); });
 }
 
 /* ============================================================
@@ -946,18 +967,20 @@ function prepare(file){
 var barTarget = 0, barAt = 0, barRaf = 0, barEl = null, pctEl = null;
 function barStart(bar, pct){
   barEl = bar; pctEl = pct; barAt = 0; barTarget = 0;
-  cancelAnimationFrame(barRaf);
-  (function tick(){
-    barAt += (barTarget - barAt) * 0.055;
+  clearInterval(barRaf);
+  // a timer, not requestAnimationFrame: rAF stops dead while the tab is in the
+  // background, so switching apps mid-read used to freeze the bar at whatever it
+  // last drew and then snap. A throttled timer still ticks.
+  barRaf = setInterval(function(){
+    barAt += (barTarget - barAt) * 0.12;
     if (barAt > 99.4) barAt = 99.4;
     barEl.style.width = barAt.toFixed(1) + "%";
     if (pctEl) pctEl.textContent = Math.round(barAt) + "%";
-    barRaf = requestAnimationFrame(tick);
-  })();
+  }, 90);
 }
 function barTo(p){ barTarget = p; }
 function barDone(){
-  cancelAnimationFrame(barRaf);
+  clearInterval(barRaf);
   if (barEl) barEl.style.width = "100%";
   if (pctEl) pctEl.textContent = "100%";
 }
@@ -980,6 +1003,23 @@ function cookLines(){
     i = (i + 1) % COOK_LINES.length;
     $("cookStep").textContent = COOK_LINES[i];
   }, 2300);
+}
+
+/* Gemini can take half a minute over a stack of photos. Jokes for the first
+   stretch, then the plain count of seconds, and a bar that keeps inching —
+   a number that has not moved in 40s reads as broken even when it is fine. */
+function cookWatch(n){
+  clearInterval(cookT);
+  var t0 = Date.now();
+  function tick(){
+    var sec = Math.floor((Date.now() - t0) / 1000);
+    $("cookStep").textContent = sec < 14
+      ? COOK_LINES[Math.floor(sec / 2) % COOK_LINES.length]
+      : "Still reading " + n + (n === 1 ? " photo" : " photos") + " — " + sec + "s";
+    barTo(Math.min(97, 88 + sec * 0.22));
+  }
+  tick();
+  cookT = setInterval(tick, 1000);
 }
 
 /* ============================================================
@@ -1100,7 +1140,7 @@ $("cookBack").addEventListener("click", function(){ show(tray.length ? "tray" : 
 var lastRaw = "";
 function cookFail(msg, raw){
   clearInterval(cookT);
-  cancelAnimationFrame(barRaf);
+  clearInterval(barRaf);
   $("cookTitle").textContent = "It choked";
   $("cookStep").textContent = "";
   $("cookMsg").textContent = msg;

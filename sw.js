@@ -1,6 +1,6 @@
 // Cache the app shell so the home-screen icon opens instantly and works offline.
 // Supabase and Gemini calls are never cached — they always go to the network.
-const CACHE = "coldandsour-v11";
+const CACHE = "coldandsour-v12";
 // caches.keys() lists every cache on the ORIGIN, not just this worker's scope, and
 // nnad88.github.io hosts other apps of mine. Sweeping "everything that isn't mine"
 // would delete theirs — and they would delete this one right back, which leaves the
