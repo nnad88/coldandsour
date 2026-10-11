@@ -326,6 +326,12 @@ input,textarea{font-family:inherit;font-size:16px}
     <div class="pct" id="cookPct">0%</div>
     <div id="cookFail" class="hide" style="margin-top:24px;width:100%;max-width:310px">
       <p style="font-size:14px;line-height:1.55;font-weight:500;color:rgba(255,255,255,.9)" id="cookMsg"></p>
+      <details id="cookRaw" style="margin-top:12px;text-align:left">
+        <summary style="font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+          text-transform:uppercase;color:rgba(255,255,255,.72);cursor:pointer">What went wrong</summary>
+        <div class="code" id="cookRawTxt" style="white-space:pre-wrap;word-break:break-word"></div>
+        <button class="mini" id="cookCopy" style="background:#fff;color:#16141A">Copy the error</button>
+      </details>
       <button class="big" id="cookRetry" style="margin-top:14px">Try again</button>
       <button class="link" id="cookBack" style="margin:4px auto 0">Back</button>
     </div>
@@ -708,7 +714,13 @@ function shrink(file, maxDim){
       cx.fillStyle = "#fff"; cx.fillRect(0, 0, cw, ch);
       cx.drawImage(img, 0, 0, cw, ch);
       URL.revokeObjectURL(url);
-      try { res(cv.toDataURL("image/jpeg", 0.82).split(",")[1]); }
+      try {
+        var d = cv.toDataURL("image/jpeg", 0.82);
+        // a canvas past the phone's memory ceiling yields "data:," instead of throwing
+        if (!d || d.indexOf("data:image/jpeg") !== 0 || d.length < 2000)
+          return rej(new Error("This phone ran out of room encoding that photo. Try fewer pages at once."));
+        res(d.split(",")[1]);
+      }
       catch(e){ rej(new Error("I could not read that photo.")); }
     };
     img.onerror = function(){ URL.revokeObjectURL(url); rej(new Error("I could not open that photo.")); };
@@ -769,10 +781,19 @@ var lastFiles = null;
 var MAX_SHOTS = 10;
 var tray = [];
 
+// Google Photos, Drive and some Android "Documents" pickers hand over a file with
+// an empty MIME type. Dropping those silently looks exactly like a broken button.
+function looksLikeImage(f){
+  if (!f || !f.size) return false;
+  if (/^image\//.test(f.type || "")) return true;
+  return !f.type && /\.(jpe?g|png|webp|gif|heic|heif|bmp|avif)$/i.test(f.name || "");
+}
+
 function addFiles(list){
-  var files = [].slice.call(list || []).filter(function(f){
-    return f && /^image\//.test(f.type || "");
-  });
+  var all = [].slice.call(list || []);
+  var files = all.filter(looksLikeImage);
+  if (all.length && !files.length)
+    return toast("That file is not an image I can read.");
   if (!files.length) return;
   var room = MAX_SHOTS - tray.length;
   if (room <= 0) return toast("Ten photos is the limit — that is a lot of menu.");
@@ -848,22 +869,29 @@ $("pickIn").addEventListener("change", took);
 // on a laptop the menu is usually already on the clipboard
 window.addEventListener("paste", function(e){
   if ((cur !== "home" && cur !== "tray") || DEMO) return;
-  var files = (e.clipboardData && e.clipboardData.files) || [];
-  if (!files.length) return;
+  var files = [].slice.call((e.clipboardData && e.clipboardData.files) || []);
+  if (!files.filter(looksLikeImage).length) return;
   e.preventDefault();
   addFiles(files);
 });
 $("cookRetry").addEventListener("click", function(){ if (lastFiles) cook(lastFiles); });
 $("cookBack").addEventListener("click", function(){ show(tray.length ? "tray" : "home"); });
 
-function cookFail(msg){
+var lastRaw = "";
+function cookFail(msg, raw){
   clearInterval(cookT);
   cancelAnimationFrame(barRaf);
   $("cookTitle").textContent = "It choked";
   $("cookStep").textContent = "";
   $("cookMsg").textContent = msg;
+  // the friendly line is a guess at what happened; keep the real thing to hand,
+  // because "it choked" on its own is useless to anybody trying to fix it
+  lastRaw = String(raw == null ? msg : raw).slice(0, 1200);
+  $("cookRawTxt").textContent = lastRaw;
+  $("cookRaw").open = false;
   $("cookFail").classList.remove("hide");
 }
+$("cookCopy").addEventListener("click", function(){ copy(lastRaw, "Error copied"); });
 
 function cookDemo(){
   show("cook");
@@ -899,6 +927,9 @@ function cook(files){
     .then(function(imgs){
       barTo(26);
       setTimeout(function(){ barTo(88); }, 400);   // the long wait is Gemini thinking
+      var mb = imgs.reduce(function(n, b){ return n + b.length; }, 0) * 0.75 / 1048576;
+      if (mb > 14) throw new Error("Those photos come to " + mb.toFixed(1) +
+        " MB, which is more than one request can carry. Read them in two goes.");
       return readMenu(imgs);
     })
     .then(function(out){
@@ -925,16 +956,22 @@ function cook(files){
       setTimeout(function(){ openGo(row); }, 420);
     })
     ["catch"](function(err){
-      var m = String(err && err.message || err);
-      if (/API key|API_KEY|PERMISSION_DENIED|API key not valid/i.test(m))
+      var raw = String(err && err.message || err);
+      if (err && err.status) raw = "HTTP " + err.status + " · " + raw;
+      var m = raw;
+      if (/API key not valid|API_KEY_INVALID|PERMISSION_DENIED/i.test(raw))
         m = "Gemini will not take that key. Check it in settings.";
-      else if (/RESOURCE_EXHAUSTED|quota|429/i.test(m))
+      else if (/RESOURCE_EXHAUSTED|quota|429/i.test(raw))
         m = "Gemini says the free quota is used up for today. It comes back on its own tomorrow.";
-      else if (/Failed to fetch|NetworkError/i.test(m))
-        m = "No connection. This one step needs the internet.";
-      else if (/relation .* does not exist|PGRST/i.test(m))
-        m = "Supabase has no tables. Run the SQL from step 2 again.";
-      cookFail(m);
+      else if (/SAFETY|blocked|PROHIBITED/i.test(raw))
+        m = "Gemini refused to answer on that image. Try a straighter, closer shot.";
+      else if (/Failed to fetch|NetworkError|ERR_|load failed/i.test(raw))
+        m = "The request never landed. Check the connection and try again.";
+      else if (/relation .* does not exist|PGRST|row-level security/i.test(raw))
+        m = "Supabase would not take the round. Re-run the SQL from step 2.";
+      else if (/not valid JSON|Unexpected token|JSON/i.test(raw))
+        m = "Gemini answered with something I could not read. Usually a retry fixes it.";
+      cookFail(m, raw);
     });
 }
 
