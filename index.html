@@ -617,7 +617,61 @@ var DEMO_DISHES = [
 /* ============================================================
    gemini — reads the menu photo into dishes
    ============================================================ */
-var MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
+/* Google retires model names without warning — gemini-2.5-flash stopped being
+   available to new keys and the app simply broke. So the name is not hardcoded
+   any more: start with a sensible default, and when the API rejects it, take the
+   replacement it names, or ask it what this key can actually use. Whatever works
+   is remembered on the device. */
+var MODEL_KEY = "cas.model";
+var DEFAULT_MODEL = "gemini-3.8-flash";
+
+function savedModel(){
+  try { return localStorage.getItem(MODEL_KEY) || ""; } catch(e){ return ""; }
+}
+function rememberModel(m){
+  try { localStorage.setItem(MODEL_KEY, m); } catch(e){}
+}
+
+// "...no longer available... Please update your code to use models/gemini-3.8-flash"
+function suggestedModel(msg){
+  var m = /use\s+models\/([A-Za-z0-9._-]+)/i.exec(String(msg || ""));
+  return m ? m[1] : "";
+}
+
+// rank "gemini-3.10-flash" above "gemini-3.8-flash" the way a human would
+function newer(a, b){
+  var na = (a.match(/\d+/g) || []).map(Number), nb = (b.match(/\d+/g) || []).map(Number);
+  for (var i = 0; i < Math.max(na.length, nb.length); i++){
+    var x = na[i] || 0, y = nb[i] || 0;
+    if (x !== y) return y - x;
+  }
+  return a < b ? -1 : 1;
+}
+
+function listModels(){
+  return fetch("https://generativelanguage.googleapis.com/v1beta/models?key=" +
+               encodeURIComponent(cfg.gkey))
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var names = (j.models || [])
+        .filter(function(m){
+          return (m.supportedGenerationMethods || []).indexOf("generateContent") >= 0;
+        })
+        .map(function(m){ return String(m.name || "").replace(/^models\//, ""); })
+        .filter(function(n){
+          // text-and-vision chat models only: no embedders, no media generators
+          return n && !/embedding|aqa|imagen|veo|tts|audio|image-generation|learnlm/i.test(n);
+        });
+      var steady = names.filter(function(n){ return !/preview|exp|latest/i.test(n); });
+      var pool = steady.length ? steady : names;
+      var tiers = [/flash-lite/i, /flash/i, /pro/i];
+      for (var t = 0; t < tiers.length; t++){
+        var hit = pool.filter(function(n){ return tiers[t].test(n); }).sort(newer);
+        if (hit.length) return hit[0];
+      }
+      return pool.sort(newer)[0] || "";
+    })["catch"](function(){ return ""; });
+}
 
 var PROMPT =
 "You are reading photos of a restaurant menu.\n\n" +
@@ -686,16 +740,30 @@ function askGemini(images, model){
 }
 
 function readMenu(images){
-  var i = 0;
-  function attempt(){
-    return askGemini(images, MODELS[i])["catch"](function(err){
-      // a model name this key can't reach — try the next one, once
-      var retryable = err.status === 404 || err.status === 400;
-      if (retryable && i < MODELS.length - 1){ i++; return attempt(); }
-      throw err;
-    });
+  var tried = {};
+
+  function attempt(model){
+    tried[model] = 1;
+    return askGemini(images, model)
+      .then(function(out){ rememberModel(model); return out; })
+      ["catch"](function(err){
+        var msg = String(err && err.message || err);
+        var gone = err.status === 404 || /not_found|no longer available|is not supported/i.test(msg);
+        if (!gone) throw err;
+
+        // the API usually names its own replacement
+        var next = suggestedModel(msg);
+        if (next && !tried[next]) return attempt(next);
+
+        // otherwise ask the key what it can actually reach
+        return listModels().then(function(found){
+          if (!found || tried[found]) throw err;
+          return attempt(found);
+        });
+      });
   }
-  return attempt();
+
+  return attempt(savedModel() || DEFAULT_MODEL);
 }
 
 /* ============================================================
