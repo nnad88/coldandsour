@@ -298,7 +298,7 @@ input,textarea{font-family:inherit;font-size:16px}
     <!-- two inputs on purpose: capture="environment" opens the camera and hides the
          gallery entirely, so a saved screenshot needs an input without it -->
     <input type="file" id="shootIn" accept="image/*" capture="environment" multiple class="hide">
-    <input type="file" id="pickIn" accept="image/*" multiple class="hide">
+    <input type="file" id="pickIn" accept="image/*,application/pdf" multiple class="hide">
   </div>
 
   <p class="foot" id="homeFoot">You are —</p>
@@ -728,7 +728,10 @@ function shrink(file, maxDim){
       }
       catch(e){ rej(new Error("I could not read that photo.")); }
     };
-    img.onerror = function(){ URL.revokeObjectURL(url); rej(new Error("I could not open that photo.")); };
+    img.onerror = function(){
+      URL.revokeObjectURL(url);
+      rej(new Error("the browser's decoder refused it"));
+    };
     img.src = url;
   });
 }
@@ -739,18 +742,51 @@ function shrink(file, maxDim){
    browser cannot resize an image we send the original bytes untouched rather
    than making the user go and convert it. */
 var GEMINI_TAKES = {
-  "image/jpeg": 1, "image/png": 1, "image/webp": 1, "image/heic": 1, "image/heif": 1
-};
-var EXT_MIME = {
-  jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png", webp:"image/webp",
-  heic:"image/heic", heif:"image/heif"
+  "image/jpeg": 1, "image/png": 1, "image/webp": 1, "image/heic": 1, "image/heif": 1,
+  "application/pdf": 1
 };
 
-function mimeOf(file){
-  var t = (file.type || "").toLowerCase();
-  if (GEMINI_TAKES[t]) return t;
-  var m = /\.([a-z0-9]+)$/i.exec(file.name || "");
-  return (m && EXT_MIME[m[1].toLowerCase()]) || "";
+/* Neither the file name nor the mime type can be trusted: Android share sheets
+   hand over "image" with no extension and no type at all, and some pickers invent
+   types the browser never uses. So read the first bytes and ask the file itself. */
+function head(file, n){
+  if (file.slice && file.slice(0, n).arrayBuffer)
+    return file.slice(0, n).arrayBuffer().then(function(b){ return new Uint8Array(b); });
+  return new Promise(function(res, rej){
+    var fr = new FileReader();
+    fr.onload = function(){ res(new Uint8Array(fr.result)); };
+    fr.onerror = function(){ rej(new Error("The file could not be read at all.")); };
+    fr.readAsArrayBuffer(file.slice(0, n));
+  });
+}
+
+function sniff(file){
+  return head(file, 16).then(function(b){
+    function at(o, str){
+      for (var i = 0; i < str.length; i++) if (b[o + i] !== str.charCodeAt(i)) return false;
+      return true;
+    }
+    if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return "image/jpeg";
+    if (b[0] === 0x89 && at(1, "PNG"))                   return "image/png";
+    if (at(0, "GIF8"))                                   return "image/gif";
+    if (at(0, "RIFF") && at(8, "WEBP"))                  return "image/webp";
+    if (at(0, "%PDF"))                                   return "application/pdf";
+    if (at(0, "BM"))                                     return "image/bmp";
+    if (at(4, "ftyp")){
+      var brand = String.fromCharCode(b[8], b[9], b[10], b[11]).toLowerCase();
+      if (/^(avif|avis)$/.test(brand)) return "image/avif";
+      return "image/heic";          // heic, heix, hevc, mif1, msf1 and friends
+    }
+    return "";
+  })["catch"](function(){ return ""; });
+}
+
+function describe(file){
+  var sz = !file.size ? "empty"
+         : file.size < 1024 ? file.size + " bytes"
+         : file.size < 1048576 ? (file.size / 1024).toFixed(0) + " KB"
+         : (file.size / 1048576).toFixed(1) + " MB";
+  return (file.name || "no name") + " · " + (file.type || "no type") + " · " + sz;
 }
 
 function fileB64(file){
@@ -762,21 +798,30 @@ function fileB64(file){
       if (i < 0) return rej(new Error("I could not read that photo."));
       res(d.slice(i + 1));
     };
-    fr.onerror = function(){ rej(new Error("I could not read that photo.")); };
+    fr.onerror = function(){ rej(new Error("The phone would not hand over " + describe(file) +
+      " — if it is in iCloud or Google Photos, open it once so it downloads.")); };
     fr.readAsDataURL(file);
   });
 }
 
 function prepare(file){
+  // resizing is only an optimisation; what matters is that Gemini gets the bytes
   return shrink(file, 2000)
     .then(function(b64){ return { mime: "image/jpeg", data: b64 }; })
     ["catch"](function(err){
-      var mime = mimeOf(file);
-      if (!mime) throw err;                       // nothing sensible to send
-      if (file.size > 6 * 1048576)
-        throw new Error("That photo is " + (file.size / 1048576).toFixed(1) +
-          " MB and this phone cannot shrink it. A screenshot of it will work.");
-      return fileB64(file).then(function(b64){ return { mime: mime, data: b64 }; });
+      return sniff(file).then(function(real){
+        if (!real)
+          throw new Error("That file is not an image I can recognise — " + describe(file) +
+                          ". (Decoder said: " + (err && err.message || err) + ")");
+        if (!GEMINI_TAKES[real])
+          throw new Error("That is a " + real.split("/")[1].toUpperCase() +
+                          ", which this phone cannot open and Gemini will not read — " +
+                          describe(file) + ". A screenshot of it will work.");
+        if (file.size > 6 * 1048576)
+          throw new Error("That file is " + (file.size / 1048576).toFixed(1) +
+            " MB and this phone cannot shrink it. A screenshot of it will work.");
+        return fileB64(file).then(function(b64){ return { mime: real, data: b64 }; });
+      });
     });
 }
 
@@ -837,8 +882,10 @@ var tray = [];
 // an empty MIME type. Dropping those silently looks exactly like a broken button.
 function looksLikeImage(f){
   if (!f || !f.size) return false;
-  if (/^image\//.test(f.type || "")) return true;
-  return !f.type && /\.(jpe?g|png|webp|gif|heic|heif|bmp|avif)$/i.test(f.name || "");
+  var t = (f.type || "").toLowerCase();
+  if (/^image\//.test(t) || t === "application/pdf") return true;
+  // an empty or odd type is normal from Android share sheets — let the bytes decide
+  return !t || /\.(jpe?g|png|webp|gif|heic|heif|bmp|avif|pdf)$/i.test(f.name || "");
 }
 
 function addFiles(list){

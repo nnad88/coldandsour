@@ -12,7 +12,8 @@ them cover two people eating out several times a week, with no card on file anyw
 
 1. Either of you shoots the menu, or taps **Upload a screenshot** to use one from the
    gallery — handy when somebody has WhatsApped you the menu. Photos collect in a tray,
-   so you can go page by page: starters, mains, the specials board, as many as ten. Drop
+   so you can go page by page: starters, mains, the specials board, as many as ten. HEIC
+   from an iPhone and a PDF the restaurant emailed both work. Drop
    the blurry ones before reading. On a laptop you can paste from the clipboard instead.
 2. A loading bar runs while Gemini reads the photo. It throws out every drink and
    every dessert and keeps only food you can order.
