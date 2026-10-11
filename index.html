@@ -897,10 +897,16 @@ function shrink(file, maxDim){
     img.onload = function(){
       var w = img.naturalWidth, h = img.naturalHeight;
       var s = Math.min(1, maxDim / Math.max(w, h));
-      // A phone screenshot is long and narrow, so capping the LONG side alone
-      // crushes the short one — a 1170x2532 screenshot came out 739px wide, which
-      // is not enough to read a dense menu. Never take the short side below this.
-      // 900 keeps small print legible while costing the model far fewer tiles.
+
+      // What the model charges for is AREA, not the longest edge. A camera photo
+      // is 4000x3000, so capping the long side at 1800 still left 2.4 megapixels,
+      // while a screenshot of the same menu came out at 1.7 — the camera was
+      // quietly the slow one. Cap the area instead.
+      var MP = 1.6 * 1000000;
+      if (w * h * s * s > MP) s = Math.sqrt(MP / (w * h));
+
+      // A screenshot is long and narrow, so neither cap must be allowed to crush
+      // the short side: below ~900px a dense menu stops being legible.
       if (Math.min(w, h) * s < 900) s = Math.min(1, 900 / Math.min(w, h));
       var cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
       var cv = document.createElement("canvas");
