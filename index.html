@@ -664,14 +664,23 @@ function listModels(){
         });
       var steady = names.filter(function(n){ return !/preview|exp|latest/i.test(n); });
       var pool = steady.length ? steady : names;
-      var tiers = [/flash-lite/i, /flash/i, /pro/i];
-      for (var t = 0; t < tiers.length; t++){
-        var hit = pool.filter(function(n){ return tiers[t].test(n); }).sort(newer);
-        if (hit.length) return hit[0];
-      }
-      return pool.sort(newer)[0] || "";
-    })["catch"](function(){ return ""; });
+      var ranked = [], tiers = [/flash-lite/i, /flash/i, /pro/i];
+      tiers.forEach(function(re){
+        pool.filter(function(n){ return re.test(n) && ranked.indexOf(n) < 0; })
+            .sort(newer).forEach(function(n){ ranked.push(n); });
+      });
+      pool.sort(newer).forEach(function(n){ if (ranked.indexOf(n) < 0) ranked.push(n); });
+      modelCache = ranked;
+      return ranked;
+    })["catch"](function(){ return []; });
 }
+
+var modelCache = null;
+function modelList(){
+  if (modelCache) return Promise.resolve(modelCache);
+  return listModels();
+}
+function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
 
 var PROMPT =
 "You are reading photos of a restaurant menu.\n\n" +
@@ -741,6 +750,15 @@ function askGemini(images, model){
 
 function readMenu(images){
   var tried = {};
+  var WAITS = [2000, 5000, 11000];   // a demand spike is usually over in seconds
+  var waited = 0;
+
+  function untried(){
+    return modelList().then(function(list){
+      for (var i = 0; i < list.length; i++) if (!tried[list[i]]) return list[i];
+      return "";
+    });
+  }
 
   function attempt(model){
     tried[model] = 1;
@@ -748,22 +766,51 @@ function readMenu(images){
       .then(function(out){ rememberModel(model); return out; })
       ["catch"](function(err){
         var msg = String(err && err.message || err);
-        var gone = err.status === 404 || /not_found|no longer available|is not supported/i.test(msg);
-        if (!gone) throw err;
+        var st = err.status;
 
-        // the API usually names its own replacement
-        var next = suggestedModel(msg);
-        if (next && !tried[next]) return attempt(next);
+        // the model name is dead: take the replacement it names, else go looking
+        if (st === 404 || /not_found|no longer available|is not supported/i.test(msg)){
+          var named = suggestedModel(msg);
+          if (named && !tried[named]) return attempt(named);
+          return untried().then(function(n){ if (!n) throw err; return attempt(n); });
+        }
 
-        // otherwise ask the key what it can actually reach
-        return listModels().then(function(found){
-          if (!found || tried[found]) throw err;
-          return attempt(found);
-        });
+        // Google is overloaded, or we are going too fast. Neither is fatal:
+        // wait a little, then try again, then try a different model.
+        var busy = st === 503 || st === 500 ||
+                   /UNAVAILABLE|high demand|overloaded|try again later/i.test(msg);
+        var paced = st === 429 && !/per day|daily|quota.*exceeded.*day/i.test(msg);
+        if (busy || paced){
+          if (waited < WAITS.length){
+            var ms = WAITS[waited++];
+            return countdown(busy ? "Gemini is busy" : "Going too fast", ms)
+              .then(function(){ return attempt(model); });
+          }
+          return untried().then(function(n){
+            if (!n) throw err;
+            waited = 0;                       // a fresh model gets its own patience
+            return countdown("Trying a different model", 800).then(function(){ return attempt(n); });
+          });
+        }
+
+        throw err;
       });
   }
 
   return attempt(savedModel() || DEFAULT_MODEL);
+}
+
+/* the bar must not look frozen while we wait out a demand spike */
+function countdown(label, ms){
+  clearInterval(cookT);
+  var end = Date.now() + ms;
+  function tick(){
+    var left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+    $("cookStep").textContent = label + " — retrying in " + left + "s…";
+  }
+  tick();
+  var h = setInterval(tick, 250);
+  return sleep(ms).then(function(){ clearInterval(h); cookLines(); });
 }
 
 /* ============================================================
@@ -1134,8 +1181,13 @@ function cook(files){
       var m = raw;
       if (/API key not valid|API_KEY_INVALID|PERMISSION_DENIED/i.test(raw))
         m = "Gemini will not take that key. Check it in settings.";
+      else if (/UNAVAILABLE|high demand|overloaded|503/i.test(raw))
+        m = "Google's servers are overloaded right now — nothing to do with your photo. " +
+            "I waited and retried a few times already; give it a minute and hit Try again.";
+      else if (/per day|daily limit/i.test(raw))
+        m = "That key has used up its free quota for today. It resets on its own tomorrow.";
       else if (/RESOURCE_EXHAUSTED|quota|429/i.test(raw))
-        m = "Gemini says the free quota is used up for today. It comes back on its own tomorrow.";
+        m = "Gemini is rate-limiting this key. Wait a moment and hit Try again.";
       else if (/SAFETY|blocked|PROHIBITED/i.test(raw))
         m = "Gemini refused to answer on that image. Try a straighter, closer shot.";
       else if (/Failed to fetch|NetworkError|ERR_|load failed/i.test(raw))
