@@ -1,6 +1,7 @@
 {
+  "id": "/coldandsour/v2",
   "name": "Cold and Sour",
-  "short_name": "Cold & Sour",
+  "short_name": "Cold and Sour",
   "description": "Photograph the menu, swipe the dishes, eat what you both said yes to.",
   "scope": "./",
   "start_url": "./",
