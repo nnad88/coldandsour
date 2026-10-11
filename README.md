@@ -10,8 +10,9 @@ them cover two people eating out several times a week, with no card on file anyw
 
 ## How a dinner goes
 
-1. Either of you taps the camera and shoots the menu. Two or three photos if it's a
-   long one — up to four in one go.
+1. Either of you shoots the menu, or taps **Upload a screenshot** to use one from the
+   gallery — handy when somebody has WhatsApped you the menu. Up to four images in one
+   go, for a long carte. On a laptop you can also just paste one from the clipboard.
 2. A loading bar runs while Gemini reads the photo. It throws out every drink and
    every dessert and keeps only food you can order.
 3. **GO** appears. The other phone sees it too, within a few seconds.

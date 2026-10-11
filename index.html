@@ -25,16 +25,23 @@
   --pad: env(safe-area-inset-bottom, 0px);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%}
+/* iOS Safari does not honour background-attachment:fixed, and in a standalone PWA
+   it leaves the strip behind the home indicator unpainted — a white bar along the
+   bottom. So: a solid backstop on html for anything outside the viewport, and the
+   gradient as its own fixed layer that always covers the viewport exactly. */
+html{height:100%;background:#FD267D}
 body{
-  margin:0; font-family:var(--sans); color:#fff;
-  background:linear-gradient(168deg,#FF5864 0%,#FF7854 52%,#FD267D 100%);
-  background-attachment:fixed;
+  margin:0; min-height:100%; font-family:var(--sans); color:#fff;
+  background:#FF5864;
   -webkit-font-smoothing:antialiased; overscroll-behavior:none;
+}
+body::before{
+  content:""; position:fixed; inset:0; z-index:-1;
+  background:linear-gradient(168deg,#FF5864 0%,#FF7854 52%,#FD267D 100%);
 }
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,textarea{font-family:inherit;font-size:16px}
-.scr{display:none;min-height:100%;flex-direction:column;
+.scr{display:none;min-height:100vh;min-height:100dvh;flex-direction:column;
   padding:calc(env(safe-area-inset-top,0px) + 18px) 18px calc(var(--pad) + 16px)}
 .scr.on{display:flex}
 
@@ -90,6 +97,11 @@ input,textarea{font-family:inherit;font-size:16px}
 .shoot{margin-top:30px;width:116px;height:116px;border-radius:999px;background:#fff;
   display:grid;place-items:center;box-shadow:0 14px 34px rgba(120,10,40,.32)}
 .shoot:active{transform:scale(.96)}
+.pick{margin-top:18px;display:inline-flex;align-items:center;gap:8px;
+  background:rgba(0,0,0,.2);color:#fff;border-radius:999px;padding:12px 20px;
+  font-size:14px;font-weight:600;letter-spacing:-.005em}
+.pick:active{transform:translateY(1px)}
+.pick svg{opacity:.85}
 .card-note{background:rgba(0,0,0,.24);border-radius:18px;padding:16px;margin-bottom:10px;text-align:left}
 .card-note .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#FFE168}
 .card-note h4{margin:7px 0 2px;font-size:17px;font-weight:700;letter-spacing:-.015em}
@@ -246,7 +258,7 @@ input,textarea{font-family:inherit;font-size:16px}
 
   <div class="hero">
     <h1>What the <em>hell</em><br>do we order?</h1>
-    <p>Take a photo of the menu. I turn it into cards you can swipe.</p>
+    <p>Photograph the menu, or upload a screenshot of one. I turn it into cards you can swipe.</p>
     <button class="shoot" id="shootBtn" aria-label="Photograph the menu">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#16141A" stroke-width="1.9"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -254,7 +266,19 @@ input,textarea{font-family:inherit;font-size:16px}
         <circle cx="12" cy="12.5" r="3.6"/>
       </svg>
     </button>
+    <button class="pick" id="pickBtn">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4.5" width="18" height="15" rx="2.5"/>
+        <circle cx="8.5" cy="10" r="1.6"/>
+        <path d="m4 17 4.8-4.4a1.6 1.6 0 0 1 2.2 0L15 16m0 0 1.6-1.5a1.6 1.6 0 0 1 2.2 0L20 16"/>
+      </svg>
+      Upload a screenshot
+    </button>
+    <!-- two inputs on purpose: capture="environment" opens the camera and hides the
+         gallery entirely, so a saved screenshot needs an input without it -->
     <input type="file" id="shootIn" accept="image/*" capture="environment" multiple class="hide">
+    <input type="file" id="pickIn" accept="image/*" multiple class="hide">
   </div>
 
   <p class="foot" id="homeFoot">You are —</p>
@@ -641,6 +665,10 @@ function shrink(file, maxDim){
     img.onload = function(){
       var w = img.naturalWidth, h = img.naturalHeight;
       var s = Math.min(1, maxDim / Math.max(w, h));
+      // A phone screenshot is long and narrow, so capping the LONG side alone
+      // crushes the short one — a 1170x2532 screenshot came out 739px wide, which
+      // is not enough to read a dense menu. Never take the short side below this.
+      if (Math.min(w, h) * s < 1000) s = Math.min(1, 1000 / Math.min(w, h));
       var cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
       var cv = document.createElement("canvas");
       cv.width = cw; cv.height = ch;
@@ -703,14 +731,34 @@ function cookLines(){
    ============================================================ */
 var lastFiles = null;
 
+function took(e){
+  var files = [].slice.call(e.target.files || [])
+                .filter(function(f){ return f && /^image\//.test(f.type || ""); })
+                .slice(0, 4);
+  e.target.value = "";          // so picking the same file twice still fires
+  if (!files.length) return;
+  lastFiles = files;
+  cook(files);
+}
+
 $("shootBtn").addEventListener("click", function(){
   if (DEMO) return cookDemo();
   $("shootIn").click();
 });
-$("shootIn").addEventListener("change", function(e){
-  var files = [].slice.call(e.target.files || []).slice(0, 4);
-  e.target.value = "";
+$("pickBtn").addEventListener("click", function(){
+  if (DEMO) return cookDemo();
+  $("pickIn").click();
+});
+$("shootIn").addEventListener("change", took);
+$("pickIn").addEventListener("change", took);
+
+// on a laptop the menu is usually already on the clipboard
+window.addEventListener("paste", function(e){
+  if (cur !== "home" || DEMO) return;
+  var items = (e.clipboardData && e.clipboardData.files) || [];
+  var files = [].slice.call(items).filter(function(f){ return /^image\//.test(f.type || ""); }).slice(0, 4);
   if (!files.length) return;
+  e.preventDefault();
   lastFiles = files;
   cook(files);
 });
@@ -756,7 +804,7 @@ function cook(files){
   cookLines();
   barTo(10);
 
-  Promise.all(files.map(function(f){ return shrink(f, 1600); }))
+  Promise.all(files.map(function(f){ return shrink(f, 2000); }))
     .then(function(imgs){
       barTo(26);
       setTimeout(function(){ barTo(88); }, 400);   // the long wait is Gemini thinking
