@@ -444,6 +444,16 @@ input,textarea{font-family:inherit;font-size:16px}
   </div>
 
   <div class="sheet">
+    <h3>Test the connection</h3>
+    <p>Sends one tiny picture to Gemini and reports exactly what it says. Use this
+       when a menu will not read — it finds the setup that works on this phone and
+       keeps it.</p>
+    <button class="mini" id="diagRun">Run the test</button>
+    <div class="code hide" id="diagOut" style="white-space:pre-wrap;word-break:break-word;max-height:220px"></div>
+    <button class="mini hide" id="diagCopy" style="background:#FF4458">Copy the report</button>
+  </div>
+
+  <div class="sheet">
     <h3>Start over</h3>
     <p>Erases the keys on this phone. The rounds stay in Supabase, nothing is lost.</p>
     <button class="mini" id="wipeBtn" style="background:#FF4458">Erase the setup</button>
@@ -653,6 +663,10 @@ function savedModel(){
 function rememberModel(m){
   try { localStorage.setItem(MODEL_KEY, m); } catch(e){}
 }
+function forgetModel(){
+  modelCache = null;
+  try { localStorage.removeItem(MODEL_KEY); } catch(e){}
+}
 
 // "...no longer available... Please update your code to use models/gemini-3.8-flash"
 function suggestedModel(msg){
@@ -722,7 +736,9 @@ var PROMPT =
 "- section: the menu's own heading for that dish, translated to English. Empty string if none.\n\n" +
 "Also return place: the restaurant's name if it is legible, else an empty string.\n\n" +
 "Return at most 60 dishes, in the order they appear on the menu. " +
-"If these photos are not a menu, return an empty dishes array.";
+"If these photos are not a menu, return an empty dishes array.\n\n" +
+"Reply with nothing but a JSON object of exactly this shape, no prose, no code fence:\n" +
+'{"place":"...","dishes":[{"name":"...","note":"...","price":"...","section":"..."}]}';
 
 var SCHEMA = {
   type: "OBJECT",
@@ -749,16 +765,47 @@ var SCHEMA = {
    before answering by default and that is where the minutes went. Asking for no
    thinking budget takes a 3-4 minute read down to seconds. Older models reject
    the field, so the first 400 that complains about it turns this off and retries. */
-var noThink = true;
-function cfg_gen(){
-  var g = {
-    temperature: 0.2,
-    responseMimeType: "application/json",
-    responseSchema: SCHEMA,
-    maxOutputTokens: 8192
-  };
-  if (noThink) g.thinkingConfig = { thinkingBudget: 0 };
+/* Every extra the request asks for is something a given model may refuse with a
+   400: no thinking budget, a response schema, a JSON mime type. Rather than
+   guessing which combination a key and model accept, the app starts with all of
+   them and drops one at a time until the call goes through, remembering what
+   worked. Dropping thinkingConfig costs speed; dropping the schema costs
+   tidiness; neither costs the dinner. */
+var FEAT_KEY = "cas.feat";
+var feat = (function(){
+  var v = null;
+  try { v = JSON.parse(localStorage.getItem(FEAT_KEY) || "null"); } catch(e){}
+  return (v && typeof v === "object") ? v : { think: 1, schema: 1, mime: 1 };
+})();
+function saveFeat(){ try { localStorage.setItem(FEAT_KEY, JSON.stringify(feat)); } catch(e){} }
+
+function genConfig(){
+  var g = { temperature: 0.2, maxOutputTokens: 8192 };
+  if (feat.mime) g.responseMimeType = "application/json";
+  if (feat.mime && feat.schema) g.responseSchema = SCHEMA;
+  if (feat.think) g.thinkingConfig = { thinkingBudget: 0 };
   return g;
+}
+
+// returns the name of whatever it switched off, or "" when nothing is left
+function dropFeature(msg){
+  if (feat.think && /think/i.test(msg)){ feat.think = 0; saveFeat(); return "thinkingConfig"; }
+  if (feat.schema && /schema/i.test(msg)){ feat.schema = 0; saveFeat(); return "responseSchema"; }
+  if (feat.mime && /mime/i.test(msg)){ feat.mime = 0; feat.schema = 0; saveFeat(); return "responseMimeType"; }
+  if (feat.think){ feat.think = 0; saveFeat(); return "thinkingConfig"; }
+  if (feat.schema){ feat.schema = 0; saveFeat(); return "responseSchema"; }
+  if (feat.mime){ feat.mime = 0; saveFeat(); return "responseMimeType"; }
+  return "";
+}
+
+/* With no schema enforced the model may wrap its JSON in prose or code fences */
+function looseJSON(txt){
+  try { return JSON.parse(txt); } catch(e){}
+  var fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(txt);
+  if (fence){ try { return JSON.parse(fence[1]); } catch(e){} }
+  var a = txt.indexOf("{"), b = txt.lastIndexOf("}");
+  if (a >= 0 && b > a){ try { return JSON.parse(txt.slice(a, b + 1)); } catch(e){} }
+  throw new Error("The answer was not JSON I could read: " + txt.slice(0, 200));
 }
 
 function askGemini(images, model){
@@ -779,7 +826,7 @@ function askGemini(images, model){
     signal: ctrl ? ctrl.signal : undefined,
     body: JSON.stringify({
       contents: [{ parts: parts }],
-      generationConfig: cfg_gen()
+      generationConfig: genConfig()
     })
   })["catch"](function(e){
     clearTimeout(bell);
@@ -799,13 +846,17 @@ function askGemini(images, model){
     done();
     var c = j && j.candidates && j.candidates[0];
     var txt = c && c.content && c.content.parts && c.content.parts[0] && c.content.parts[0].text;
-    if (!txt) throw new Error("Gemini returned nothing readable.");
-    return JSON.parse(txt);
+    if (!txt){
+      var why = (c && c.finishReason) ? (" (finishReason: " + c.finishReason + ")") : "";
+      throw new Error("Gemini returned nothing readable" + why + ".");
+    }
+    return looseJSON(txt);
   });
 }
 
 function readMenu(images){
   var tried = {};
+  var simplified = 0, reDiscovered = false;
   var WAITS = [2000, 5000, 11000];   // a demand spike is usually over in seconds
   var waited = 0;
 
@@ -829,11 +880,22 @@ function readMenu(images){
         var msg = String(err && err.message || err);
         var st = err.status;
 
-        // this model does not know thinkingConfig: drop it and try once more
-        if (noThink && st === 400 && /thinking|thinkingBudget|thinking_budget|Unknown name/i.test(msg)){
-          noThink = false;
-          delete tried[model];
-          return attempt(model);
+        // a 400 means the request asked for something this model will not do:
+        // switch one extra off and come straight back, up to three times
+        if (st === 400 && simplified < 3){
+          var off = dropFeature(msg);
+          if (off){
+            simplified++;
+            delete tried[model];
+            $("cookStep").textContent = "Adjusting the request (" + off + ")…";
+            return attempt(model);
+          }
+          // nothing left to simplify: the model itself may be the wrong one
+          if (!reDiscovered){
+            reDiscovered = true;
+            forgetModel();
+            return untried().then(function(n){ if (!n) throw err; return attempt(n); });
+          }
         }
 
         // the model name is dead: take the replacement it names, else go looking
@@ -1937,6 +1999,107 @@ $("wipeBtn").addEventListener("click", function(){
   location.hash = "";
   location.reload();
 });
+
+/* A self-test, because guessing from the outside is how this went wrong before.
+   It walks the same ladder a real read walks — every extra on, then one off at a
+   time — against a 2x2 picture, and keeps the first rung that answers. */
+function tinyJPEG(){
+  var cv = document.createElement("canvas");
+  cv.width = cv.height = 2;
+  var cx = cv.getContext("2d");
+  cx.fillStyle = "#fff"; cx.fillRect(0, 0, 2, 2);
+  return cv.toDataURL("image/jpeg", 0.6).split(",")[1];
+}
+
+function probe(model, cfgName, gen){
+  var body = {
+    contents: [{ parts: [
+      { text: "Reply with the JSON object {\"ok\":true} and nothing else." },
+      { inline_data: { mime_type: "image/jpeg", data: tinyJPEG() } }
+    ] }],
+    generationConfig: gen
+  };
+  var t0 = Date.now();
+  return fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model +
+               ":generateContent?key=" + encodeURIComponent(cfg.gkey), {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+  }).then(function(r){
+    return r.text().then(function(t){
+      var ms = Date.now() - t0;
+      if (r.ok) return { ok: true, line: "OK   " + cfgName + "  (" + ms + "ms)" };
+      var why = t;
+      try { why = JSON.parse(t).error.message; } catch(e){}
+      return { ok: false, line: "FAIL " + cfgName + "  HTTP " + r.status + " — " + why.slice(0, 160) };
+    });
+  })["catch"](function(e){
+    return { ok: false, line: "FAIL " + cfgName + "  " + (e && e.message || e) };
+  });
+}
+
+function selfTest(){
+  var out = ["Cold and Sour — connection test", new Date().toISOString(), ""];
+  var base = { temperature: 0.2, maxOutputTokens: 256 };
+  var rungs = [
+    ["everything on",      { mime: 1, schema: 1, think: 1 }],
+    ["no thinkingConfig",  { mime: 1, schema: 1, think: 0 }],
+    ["no schema",          { mime: 1, schema: 0, think: 0 }],
+    ["plain text out",     { mime: 0, schema: 0, think: 0 }]
+  ];
+
+  return modelList().then(function(list){
+    out.push("models this key can use: " + (list.length || 0));
+    if (list.length) out.push("  " + list.slice(0, 6).join(", "));
+    var model = savedModel() || list[0] || DEFAULT_MODEL;
+    out.push("testing with: " + model, "");
+
+    var i = 0, winner = null;
+    function step(){
+      if (i >= rungs.length) return;
+      var name = rungs[i][0], f = rungs[i][1];
+      var gen = { temperature: base.temperature, maxOutputTokens: base.maxOutputTokens };
+      if (f.mime) gen.responseMimeType = "application/json";
+      if (f.mime && f.schema) gen.responseSchema = { type: "OBJECT", properties: { ok: { type: "BOOLEAN" } }, required: ["ok"] };
+      if (f.think) gen.thinkingConfig = { thinkingBudget: 0 };
+      return probe(model, name, gen).then(function(r){
+        out.push(r.line);
+        if (r.ok && !winner){ winner = f; return; }
+        i++; return step();
+      });
+    }
+
+    return step().then(function(){
+      out.push("");
+      if (winner){
+        feat = { think: winner.think, schema: winner.schema, mime: winner.mime };
+        saveFeat();
+        rememberModel(model);
+        out.push("Saved. Menus will use this from now on.");
+      } else {
+        out.push("Nothing worked. The key itself is the likeliest problem —");
+        out.push("make a new one at aistudio.google.com/apikey and paste it above.");
+      }
+      return out.join("\n");
+    });
+  })["catch"](function(e){
+    out.push("Could not even list models: " + (e && e.message || e));
+    return out.join("\n");
+  });
+}
+
+var diagText = "";
+$("diagRun").addEventListener("click", function(){
+  var btn = $("diagRun");
+  btn.disabled = true; btn.textContent = "Testing…";
+  $("diagOut").classList.remove("hide");
+  $("diagOut").textContent = "Running…";
+  selfTest().then(function(txt){
+    diagText = txt;
+    $("diagOut").textContent = txt;
+    $("diagCopy").classList.remove("hide");
+    btn.disabled = false; btn.textContent = "Run it again";
+  });
+});
+$("diagCopy").addEventListener("click", function(){ copy(diagText, "Report copied"); });
 
 /* ============================================================
    boot
