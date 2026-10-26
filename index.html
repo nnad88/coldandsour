@@ -696,7 +696,7 @@ function listModels(){
         .map(function(m){ return String(m.name || "").replace(/^models\//, ""); })
         .filter(function(n){
           // text-and-vision chat models only: no embedders, no media generators
-          return n && !/embedding|aqa|imagen|veo|tts|audio|image-generation|learnlm/i.test(n);
+          return n && !/embedding|aqa|imagen|veo|tts|audio|image|learnlm/i.test(n);
         });
       var steady = names.filter(function(n){ return !/preview|exp|latest/i.test(n); });
       var pool = steady.length ? steady : names;
@@ -905,16 +905,32 @@ function readMenu(images){
           return untried().then(function(n){ if (!n) throw err; return attempt(n); });
         }
 
-        // Google is overloaded, or we are going too fast. Neither is fatal:
+        // Free-tier quota is counted per model, not per key. When one is spent,
+        // waiting will not refill it — but the next model has its own allowance.
+        if (st === 429){
+          var perMinute = /per minute|requests per minute|\bRPM\b|rate limit/i.test(msg);
+          if (perMinute && waited < WAITS.length){
+            var pause = WAITS[waited++];
+            return countdown("Going too fast", pause).then(function(){ return attempt(model); });
+          }
+          forgetModel();                       // do not keep reaching for a dry one
+          return untried().then(function(n){
+            if (!n) throw new Error("Every model this key can reach is out of free quota " +
+              "for now. A new key, or tomorrow, will fix it. (" + msg.slice(0, 120) + ")");
+            waited = 0;
+            return countdown("That model is out of quota — trying another", 700)
+              .then(function(){ return attempt(n); });
+          });
+        }
+
+        // Google is overloaded, or the request stalled. Neither is fatal:
         // wait a little, then try again, then try a different model.
         var busy = st === 503 || st === 500 || st === 504 ||
                    /UNAVAILABLE|high demand|overloaded|try again later|stalled/i.test(msg);
-        var paced = st === 429 && !/per day|daily|quota.*exceeded.*day/i.test(msg);
-        if (busy || paced){
+        if (busy){
           if (waited < WAITS.length){
             var ms = WAITS[waited++];
-            return countdown(busy ? "Gemini is busy" : "Going too fast", ms)
-              .then(function(){ return attempt(model); });
+            return countdown("Gemini is busy", ms).then(function(){ return attempt(model); });
           }
           return untried().then(function(n){
             if (!n) throw err;
@@ -1359,8 +1375,11 @@ function cook(files){
             "I waited and retried a few times already; give it a minute and hit Try again.";
       else if (/per day|daily limit/i.test(raw))
         m = "That key has used up its free quota for today. It resets on its own tomorrow.";
+      else if (/out of free quota/i.test(raw))
+        m = raw;
       else if (/RESOURCE_EXHAUSTED|quota|429/i.test(raw))
-        m = "Gemini is rate-limiting this key. Wait a moment and hit Try again.";
+        m = "This key is out of free quota on every model it can reach. " +
+            "Run the connection test in settings, or make a fresh key.";
       else if (/SAFETY|blocked|PROHIBITED/i.test(raw))
         m = "Gemini refused to answer on that image. Try a straighter, closer shot.";
       else if (/Failed to fetch|NetworkError|ERR_|load failed/i.test(raw))
@@ -2038,50 +2057,74 @@ function probe(model, cfgName, gen){
 
 function selfTest(){
   var out = ["Cold and Sour — connection test", new Date().toISOString(), ""];
-  var base = { temperature: 0.2, maxOutputTokens: 256 };
   var rungs = [
-    ["everything on",      { mime: 1, schema: 1, think: 1 }],
-    ["no thinkingConfig",  { mime: 1, schema: 1, think: 0 }],
-    ["no schema",          { mime: 1, schema: 0, think: 0 }],
-    ["plain text out",     { mime: 0, schema: 0, think: 0 }]
+    ["everything on",     { mime: 1, schema: 1, think: 1 }],
+    ["no thinkingConfig", { mime: 1, schema: 1, think: 0 }],
+    ["no schema",         { mime: 1, schema: 0, think: 0 }],
+    ["plain text out",    { mime: 0, schema: 0, think: 0 }]
   ];
 
   return modelList().then(function(list){
-    out.push("models this key can use: " + (list.length || 0));
-    if (list.length) out.push("  " + list.slice(0, 6).join(", "));
-    var model = savedModel() || list[0] || DEFAULT_MODEL;
-    out.push("testing with: " + model, "");
+    out.push("models this key can use: " + list.length);
+    if (!list.length){
+      out.push("", "The key cannot reach any model at all. Make a fresh one at",
+               "aistudio.google.com/apikey and paste it above.");
+      return out.join("\n");
+    }
 
-    var i = 0, winner = null;
-    function step(){
-      if (i >= rungs.length) return;
-      var name = rungs[i][0], f = rungs[i][1];
-      var gen = { temperature: base.temperature, maxOutputTokens: base.maxOutputTokens };
-      if (f.mime) gen.responseMimeType = "application/json";
-      if (f.mime && f.schema) gen.responseSchema = { type: "OBJECT", properties: { ok: { type: "BOOLEAN" } }, required: ["ok"] };
-      if (f.think) gen.thinkingConfig = { thinkingBudget: 0 };
-      return probe(model, name, gen).then(function(r){
-        out.push(r.line);
-        if (r.ok && !winner){ winner = f; return; }
-        i++; return step();
+    // Free quota is per model, so one being spent says nothing about the next.
+    var pool = list.slice(0, 5);
+    out.push("trying, in order: " + pool.join(", "), "");
+
+    var mi = 0, won = null;
+
+    function tryModel(){
+      if (mi >= pool.length || won) return;
+      var model = pool[mi];
+      out.push(model + ":");
+      var ri = 0, quotaHit = false;
+
+      function rung(){
+        if (ri >= rungs.length || won || quotaHit) return;
+        var name = rungs[ri][0], f = rungs[ri][1];
+        var gen = { temperature: 0.2, maxOutputTokens: 256 };
+        if (f.mime) gen.responseMimeType = "application/json";
+        if (f.mime && f.schema) gen.responseSchema =
+          { type: "OBJECT", properties: { ok: { type: "BOOLEAN" } }, required: ["ok"] };
+        if (f.think) gen.thinkingConfig = { thinkingBudget: 0 };
+
+        return probe(model, name, gen).then(function(r){
+          out.push("  " + r.line);
+          if (r.ok){ won = { model: model, feat: f }; return; }
+          // a spent allowance is the model's, not the request's: stop poking it
+          if (/429|quota/i.test(r.line)){ quotaHit = true; return; }
+          ri++; return rung();
+        });
+      }
+
+      return rung().then(function(){
+        if (won) return;
+        mi++; return tryModel();
       });
     }
 
-    return step().then(function(){
+    return tryModel().then(function(){
       out.push("");
-      if (winner){
-        feat = { think: winner.think, schema: winner.schema, mime: winner.mime };
+      if (won){
+        feat = { think: won.feat.think, schema: won.feat.schema, mime: won.feat.mime };
         saveFeat();
-        rememberModel(model);
-        out.push("Saved. Menus will use this from now on.");
+        rememberModel(won.model);
+        out.push("WORKS: " + won.model);
+        out.push("Saved — menus will use it from now on.");
       } else {
-        out.push("Nothing worked. The key itself is the likeliest problem —");
-        out.push("make a new one at aistudio.google.com/apikey and paste it above.");
+        out.push("No model answered. If every line says quota, this key has spent its");
+        out.push("free allowance everywhere; it resets daily. A key from a NEW Google");
+        out.push("Cloud project gets its own allowance: aistudio.google.com/apikey");
       }
       return out.join("\n");
     });
   })["catch"](function(e){
-    out.push("Could not even list models: " + (e && e.message || e));
+    out.push("Could not list models: " + (e && e.message || e));
     return out.join("\n");
   });
 }
