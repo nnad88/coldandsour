@@ -2,3 +2,4 @@
 .claude/serve.js
 .claude/launch.json
 node_modules/
+.fakedb.js

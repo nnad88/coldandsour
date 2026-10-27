@@ -140,6 +140,34 @@ input,textarea{font-family:inherit;font-size:16px}
 .trayAdd{display:flex;gap:9px;padding-top:12px;flex:none}
 .trayAdd .ghost{flex:1}
 
+
+/* ---------- lobby ---------- */
+.lob{flex:1;display:flex;flex-direction:column;align-items:center;gap:12px;overflow-y:auto;min-height:0}
+.lobLede{margin:0 4px;text-align:center;font-size:13.5px;line-height:1.5;font-weight:500;
+  color:rgba(255,255,255,.85);flex:none}
+.qrbox{background:#fff;border-radius:18px;padding:12px;flex:none;display:grid;place-items:center;
+  box-shadow:0 10px 26px rgba(120,10,40,.26)}
+.qrbox canvas{display:block;width:174px;height:174px}
+.who-list{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;flex:none;padding:2px 0}
+.who-chip{display:inline-flex;align-items:center;gap:7px;background:rgba(0,0,0,.24);
+  border-radius:999px;padding:7px 13px;font-size:13.5px;font-weight:600}
+.who-chip i{width:7px;height:7px;border-radius:999px;background:#16D29C;display:block;flex:none}
+.who-chip.idle i{background:rgba(255,255,255,.4)}
+.who-chip b{font-weight:700;color:#FFE168}
+.cats{width:100%;flex:none;padding-top:4px}
+.catLede{margin:0 0 9px;text-align:center;font-family:var(--mono);font-size:10px;
+  letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.72)}
+.cat{display:flex;align-items:center;gap:11px;width:100%;background:rgba(0,0,0,.24);
+  border-radius:14px;padding:13px 15px;margin-bottom:7px;text-align:left}
+.cat .box{width:23px;height:23px;border-radius:7px;border:2px solid rgba(255,255,255,.5);
+  flex:none;display:grid;place-items:center}
+.cat[aria-pressed="true"] .box{background:#fff;border-color:#fff}
+.cat .nm{flex:1;font-size:15.5px;font-weight:700;letter-spacing:-.01em;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat .ct{font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.66);flex:none}
+#lobbyFootArea{flex:none;padding-top:10px}
+#lobbyFootArea .step{text-align:center;padding-bottom:8px}
+
 /* ---------- cooking ---------- */
 .cook{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
 .cook h2{margin:0 0 7px;font-size:27px;font-weight:800;letter-spacing:-.025em}
@@ -163,8 +191,9 @@ input,textarea{font-family:inherit;font-size:16px}
   border-radius:24px;box-shadow:0 18px 44px rgba(120,10,40,.34);padding:26px 24px 22px;
   display:flex;flex-direction:column;overflow:hidden;touch-action:none;will-change:transform;
   pointer-events:auto}
-.swipe .sec{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--red)}
-.swipe h2{margin:11px 0 0;font-size:34px;line-height:.99;font-weight:800;letter-spacing:-.03em;text-wrap:balance}
+.swipe .sec{font-family:var(--mono);font-size:12.5px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--red)}
+.swipe h2{margin:9px 0 0;font-size:34px;line-height:.99;font-weight:800;letter-spacing:-.03em;text-wrap:balance}
 .swipe h2.sm{font-size:28px}
 .swipe h2.xs{font-size:23px;line-height:1.06}
 .swipe .desc{margin:12px 0 0;font-size:14.5px;line-height:1.48;color:var(--mut);font-weight:500;
@@ -192,8 +221,10 @@ input,textarea{font-family:inherit;font-size:16px}
 .list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px}
 .hit{background:#fff;color:var(--ink);border-radius:17px;padding:16px 17px;margin-bottom:9px;
   display:flex;gap:13px;align-items:flex-start}
-.hit .num{flex:none;width:26px;height:26px;border-radius:999px;background:var(--green);color:#fff;
-  font-family:var(--mono);font-size:11px;display:grid;place-items:center;margin-top:1px}
+.hit .num{flex:none;min-width:26px;height:26px;padding:0 7px;border-radius:999px;background:var(--green);
+  color:#fff;font-family:var(--mono);font-size:11px;display:grid;place-items:center;margin-top:1px}
+.hit .num.part{background:#DCD8E0;color:#5A5563}
+.hit .whos{margin-top:5px;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--faint)}
 .hit h4{margin:0;font-size:17px;line-height:1.2;font-weight:700;letter-spacing:-.018em}
 .hit p{margin:5px 0 0;font-size:12.5px;line-height:1.45;color:var(--mut);font-weight:500}
 .hit .pr{margin-left:auto;flex:none;font-size:15px;font-weight:700;padding-left:4px}
@@ -305,10 +336,11 @@ input,textarea{font-family:inherit;font-size:16px}
     </button>
     <!-- two inputs on purpose: capture="environment" opens the camera and hides the
          gallery entirely, so a saved screenshot needs an input without it -->
-    <!-- One input, no capture attribute. HTML cannot stop Android putting Camera in
-         the picker, so rather than two buttons that both reach a camera there is one
-         button and the system sheet offers camera or gallery. -->
-    <input type="file" id="pickIn" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif,application/pdf" multiple class="hide">
+    <!-- image/* rather than a type list: the list sends Android to a document
+         picker that takes one file at a time, while image/* opens the photo
+         picker, where a whole menu can be selected in one go. Its camera entry is
+         not redundant any more — this is the only photo button. -->
+    <input type="file" id="pickIn" accept="image/*,application/pdf" multiple class="hide">
   </div>
 
   <p class="foot" id="homeFoot">You are —</p>
@@ -321,10 +353,10 @@ input,textarea{font-family:inherit;font-size:16px}
     <span class="pill" id="trayCount">0 photos</span>
   </div>
   <p class="trayLede">Add every part of the menu — starters, mains, the specials board.
-     They are read together, in this order.</p>
+     Pick several at once. They are read together, in this order.</p>
   <div class="thumbs" id="thumbs"></div>
   <div class="trayAdd">
-    <button class="ghost" id="trayPick">Add another page</button>
+    <button class="ghost" id="trayPick">Add more pages</button>
   </div>
   <button class="big" id="trayGo" style="margin-top:10px">Read the menu</button>
   <p class="foot" id="trayFoot">—</p>
@@ -349,6 +381,48 @@ input,textarea{font-family:inherit;font-size:16px}
       <button class="big" id="cookRetry" style="margin-top:14px">Try again</button>
       <button class="link" id="cookBack" style="margin:4px auto 0">Back</button>
     </div>
+  </div>
+</section>
+
+<!-- ============================= LOBBY (host) ============================= -->
+<section class="scr" id="s-lobby">
+  <div class="top">
+    <button class="pill tap" id="lobbyQuit">← leave</button>
+    <span class="pill" id="lobbyCode">—</span>
+  </div>
+
+  <div class="lob">
+    <p class="lobLede" id="lobLede">Anyone at the table can scan this and swipe with you.</p>
+    <div class="qrbox"><canvas id="lobbyQR"></canvas><div class="qrmiss hide" id="lobbyQRmiss"></div></div>
+    <button class="ghost" id="lobbyShare">Send the link instead</button>
+
+    <div class="who-list" id="lobbyWho"></div>
+
+    <div class="cats hide" id="lobbyCats">
+      <p class="catLede">What are we choosing between?</p>
+      <div id="catList"></div>
+    </div>
+  </div>
+
+  <div id="lobbyFootArea">
+    <div class="step" id="lobbyState">Reading the menu…</div>
+    <button class="big hide" id="lobbyGo">Start swiping</button>
+  </div>
+</section>
+
+<!-- ============================= JOIN (guest) ============================= -->
+<section class="scr" id="s-join">
+  <div class="top"><span class="brand">cold &amp; sour</span><span class="pill" id="joinCode">—</span></div>
+  <div class="cook">
+    <h2 id="joinTitle">You're in</h2>
+    <div class="step" id="joinSub">What should they call you?</div>
+    <div style="height:22px"></div>
+    <input id="joinName" placeholder="Your name" autocomplete="given-name" maxlength="14"
+      style="width:100%;max-width:300px;background:rgba(0,0,0,.24);border:1.5px solid rgba(255,255,255,.3);
+      border-radius:13px;padding:15px;color:#fff;font-weight:600;text-align:center;font-size:17px">
+    <div style="height:14px"></div>
+    <button class="big" id="joinGo" style="max-width:300px">Join the table</button>
+    <p class="foot" id="joinErr"></p>
   </div>
 </section>
 
@@ -480,10 +554,33 @@ function loadCfg(){
   catch(e){ return null; }
 }
 function saveCfg(c){ try { localStorage.setItem(CFG_KEY, JSON.stringify(c)); } catch(e){} cfg = c; }
-function meName(){ return (cfg.names[cfg.me] || "you"); }
-function themName(){ return (cfg.names[1 - cfg.me] || "the other one"); }
-function meId(){ return "p" + cfg.me; }
-function themId(){ return "p" + (1 - cfg.me); }
+/* Identity used to be "one of two phones". A round can now hold any number of
+   people, so everyone — host or guest — is just an id with a name against it.
+   The old two-phone config still resolves, so nothing on your phones breaks. */
+function meId(){
+  if (cfg.guest && cfg.guest.id) return cfg.guest.id;
+  return "p" + cfg.me;
+}
+function meName(){
+  if (cfg.guest && cfg.guest.name) return cfg.guest.name;
+  return (cfg.names && cfg.names[cfg.me]) || "you";
+}
+function isGuest(){ return !!(cfg.guest && cfg.guest.id); }
+
+/* The room code a round is joined by. Guests hold it instead of a pair code and
+   send it as the same header, so row security lets them at that one round. */
+function roomOf(r){ return (r && r.room) || null; }
+
+/* everyone who has joined this round, host first, me marked */
+var crowd = [];                       // [{id,name,done,votes,n}]
+function crowdOf(ballots, dishCount){
+  return (ballots || []).map(function(b){
+    var n = b.votes ? Object.keys(b.votes).length : 0;
+    return { id: b.voter, name: b.name || "someone", done: !!b.done,
+             votes: b.votes || {}, n: n, of: dishCount };
+  });
+}
+function others(){ return crowd.filter(function(c){ return c.id !== meId(); }); }
 
 function rndId(n){
   var a = "abcdefghjkmnpqrstuvwxyz23456789", s = "";
@@ -532,25 +629,34 @@ function show(name){
   stopPolls();
   if (name === "home") pollHome();
   if (name === "wait") pollWait();
+  if (name === "lobby") pollLobby();
 }
 
 /* ============================================================
    supabase — plain REST. Realtime can't see the pair header,
    so everything polls instead. At two people that is free.
    ============================================================ */
-function sbHeaders(){
+/* the room code of the round in hand, so ballots land where guests can see them */
+var curRoom = null;
+
+function sbHeaders(as){
   return { "apikey": cfg.key, "Authorization": "Bearer " + cfg.key,
-           "x-pair": cfg.pair, "Content-Type": "application/json" };
+           "x-pair": as || cfg.pair, "Content-Type": "application/json" };
 }
 function sb(path, opts){
   opts = opts || {};
   return fetch(cfg.url + "/rest/v1/" + path, {
     method: opts.method || "GET",
-    headers: Object.assign(sbHeaders(), opts.headers || {}),
+    headers: Object.assign(sbHeaders(opts.as), opts.headers || {}),
     body: opts.body ? JSON.stringify(opts.body) : undefined
   }).then(function(r){
-    if (!r.ok) return r.text().then(function(t){ throw new Error(t || ("HTTP " + r.status)); });
-    return r.status === 204 ? null : r.json();
+    // Prefer: return=minimal answers 204, but a bare 201 with no body happens too,
+    // and r.json() on an empty body throws — which looked exactly like being offline
+    return r.text().then(function(t){
+      if (!r.ok) throw new Error(t || ("HTTP " + r.status));
+      if (!t) return null;
+      try { return JSON.parse(t); } catch(e){ return null; }
+    });
   });
 }
 function getRounds(){
@@ -565,30 +671,28 @@ function putRound(row){
   if (DEMO) return Promise.resolve(fake.putRound(row));
   return sb("rounds", { method:"POST", body: row, headers:{ "Prefer":"return=representation" } });
 }
-function getBallots(roundId){
+function getBallots(roundId, room){
   if (DEMO) return Promise.resolve(fake.ballots(roundId));
-  return sb("ballots?select=*&round_id=eq." + encodeURIComponent(roundId));
-}
-/* every ballot for a set of rounds, in one request — the home screen's poll */
-function getBallotsFor(ids){
-  if (!ids.length) return Promise.resolve([]);
-  if (DEMO) return Promise.resolve(fake.ballotsFor(ids));
-  return sb("ballots?select=round_id,voter,votes,done&round_id=in.(" + ids.join(",") + ")");
+  return sb("ballots?select=*&round_id=eq." + encodeURIComponent(roundId),
+            { as: room || curRoom });
 }
 function putBallot(roundId, votes, done){
   if (DEMO) return Promise.resolve(fake.putBallot(roundId, meId(), votes, done));
   return sb("ballots", {
     method: "POST",
+    as: curRoom,
     headers: { "Prefer": "resolution=merge-duplicates,return=minimal" },
-    body: { round_id: roundId, pair: cfg.pair, voter: meId(),
-            votes: votes, done: !!done, updated_at: new Date().toISOString() }
+    body: { round_id: roundId, pair: cfg.pair, room: curRoom, voter: meId(),
+            name: meName(), votes: votes, done: !!done,
+            updated_at: new Date().toISOString() }
   });
 }
 
-function dropRound(id){
+function dropRound(id, room){
   if (DEMO) return Promise.resolve(fake.drop(id));
-  // ballots first: a round with orphaned votes would come back looking half-played
-  return sb("ballots?round_id=eq." + encodeURIComponent(id), { method: "DELETE" })
+  // ballots first: a round with orphaned votes would come back looking half-played,
+  // and guests' ballots are only reachable through the room code
+  return sb("ballots?round_id=eq." + encodeURIComponent(id), { method: "DELETE", as: room })
     .then(function(){ return sb("rounds?id=eq." + encodeURIComponent(id), { method: "DELETE" }); });
 }
 
@@ -611,6 +715,14 @@ var fake = (function(){
       put(s); return row;
     },
     ballots: function(id){ return all().b.filter(function(b){ return b.round_id === id; }); },
+    patch: function(id, f){
+      var st = all();
+      st.r.forEach(function(r){ if (r.id === id) Object.keys(f).forEach(function(k){ r[k] = f[k]; }); });
+      put(st); return null;
+    },
+    byRoom: function(room){
+      return all().r.filter(function(r){ return r.room === room; })[0] || null;
+    },
     drop: function(id){
       var st = all();
       st.r = st.r.filter(function(r){ return r.id !== id; });
@@ -720,20 +832,23 @@ function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
 
 var PROMPT =
 "You are reading photos of a restaurant menu.\n\n" +
-"Extract ONLY savoury food dishes that a person would order to eat.\n\n" +
+"Extract every dish a person would order to eat.\n\n" +
 "INCLUDE: starters, tapas, raciones, salads, soups, rice, pasta, fish, meat, eggs, vegetables, " +
 "sandwiches, burgers, pizzas, sides, bread with toppings, and set-menu dishes listed by name.\n\n" +
+"INCLUDE DESSERTS TOO: ice cream, cake, flan, fruit, pastries, cheesecake, chocolate.\n\n" +
 "EXCLUDE COMPLETELY, no exceptions: every drink (water, wine, beer, vermouth, soft drinks, juice, " +
-"coffee, tea, spirits, cocktails), every dessert and sweet (ice cream, cake, flan, fruit, pastries, " +
-"cheesecake, chocolate), bread-and-cover charges, allergen legends, opening hours, addresses, " +
-"wifi passwords, prices with no dish, and section headings on their own.\n\n" +
+"coffee, tea, spirits, cocktails), bread-and-cover charges, allergen legends, opening hours, " +
+"addresses, wifi passwords, prices with no dish, and section headings on their own.\n\n" +
 "For each dish return:\n" +
 "- name: exactly as printed, in the menu's own language. Repair only obvious OCR damage.\n" +
 "- note: ALWAYS IN ENGLISH, under 140 characters. Translate the menu's own description if it has " +
 "one; if it does not, write your own plain 8-14 word description of what the dish actually is. " +
 "This is so the pair can read a menu in a language they do not speak.\n" +
 "- price: as printed, with its currency symbol, e.g. \"9,50 €\". Empty string if no price is shown.\n" +
-"- section: the menu's own heading for that dish, translated to English. Empty string if none.\n\n" +
+"- section: the course this dish belongs to, as the menu groups them, in English, " +
+"Title Case, two or three words at most — Starters, Pizzas, Pasta, Rice, Fish, Meat, " +
+"Salads, Sides, Burgers, Desserts. Use the menu's own grouping where it has one, and " +
+"give every dish a section; never leave it empty.\n\n" +
 "Also return place: the restaurant's name if it is legible, else an empty string.\n\n" +
 "Return at most 60 dishes, in the order they appear on the menu. " +
 "If these photos are not a menu, return an empty dishes array.\n\n" +
@@ -1169,9 +1284,11 @@ function cookWatch(n){
   var expect = Math.max(6, pace() * n);
   function tick(){
     var sec = (Date.now() - watchT0) / 1000;
-    $("cookStep").textContent = sec < 14
+    var txt = sec < 14
       ? COOK_LINES[Math.floor(sec / 2) % COOK_LINES.length]
       : "Still reading " + n + (n === 1 ? " photo" : " photos") + " — " + Math.floor(sec) + "s";
+    $("cookStep").textContent = txt;
+    if (cur === "lobby") $("lobbyState").textContent = txt;
     barTo(6 + 90 * (1 - Math.exp(-sec / expect)));
   }
   tick();
@@ -1325,17 +1442,22 @@ function cookDemo(){
 }
 
 function cook(files){
-  show("cook");
-  $("cookFail").classList.add("hide");
-  $("cookTitle").textContent = "Reading the menu";
-  $("cookPill").textContent = files.length > 1 ? files.length + " photos" : "1 photo";
-  barStart($("cookBar"), $("cookPct"));
-  cookLines();
-  barTo(4);
+  // The room exists before the menu does, so the QR is scannable while Gemini
+  // reads — by the time the dishes land, everyone is already at the table.
+  var row = {
+    id: rndId(6), pair: cfg.pair, room: rndId(5).toUpperCase(),
+    place: "", dishes: [], sections: null, state: "reading",
+    shot_by: meId(), host_name: meName()
+  };
+  catsOn = {};
+  curRoom = row.room;
+  putRound(row)["catch"](function(){});        // guests can join the moment it lands
+  putBallot(row.id, {}, false)["catch"](function(){});   // the host is at the table too
+  openLobby(row);
+  $("lobbyState").textContent = "Reading the menu…";
 
   Promise.all(files.map(prepare))
     .then(function(imgs){
-      barTo(6);     // resizing is the fast part; cookWatch owns the rest
       var mb = imgs.reduce(function(n, im){ return n + im.data.length; }, 0) * 0.75 / 1048576;
       if (mb > 14) throw new Error("Those photos come to " + mb.toFixed(1) +
         " MB, which is more than one request can carry. Read them in two goes.");
@@ -1343,26 +1465,24 @@ function cook(files){
     })
     .then(function(out){
       var dishes = (out.dishes || []).filter(function(d){ return d && d.name && String(d.name).trim(); });
-      if (!dishes.length) throw new Error("I could not find any dishes in that photo. Try more light, closer in, or the menu flatter.");
-      barTo(97);
-      var row = {
-        id: rndId(6),
-        pair: cfg.pair,
-        place: String(out.place || "").slice(0, 80),
-        shot_by: meId(),
-        dishes: dishes.slice(0, 60).map(function(d){
-          return { name: String(d.name).trim().slice(0, 120),
-                   note: String(d.note || "").trim().slice(0, 180),
-                   price: String(d.price || "").trim().slice(0, 20),
-                   section: String(d.section || "").trim().slice(0, 50) };
-        })
-      };
-      return putRound(row).then(function(){ return row; });
+      if (!dishes.length) throw new Error("I could not find any dishes in those photos. Try more light, closer in, or the menu flatter.");
+      row.place = String(out.place || "").slice(0, 80);
+      row.dishes = dishes.slice(0, 80).map(function(d){
+        return { name: String(d.name).trim().slice(0, 120),
+                 note: String(d.note || "").trim().slice(0, 180),
+                 price: String(d.price || "").trim().slice(0, 20),
+                 section: (String(d.section || "").trim() || "Dishes").slice(0, 40) };
+      });
+      row.state = "choosing";
+      return patchRound(row.id, { place: row.place, dishes: row.dishes, state: "choosing" })
+        .then(function(){ return row; });
     })
-    .then(function(row){
-      barTo(100); barDone(); clearInterval(cookT);
+    .then(function(r){
+      clearInterval(cookT);
       clearTray();
-      setTimeout(function(){ openGo(row); }, 420);
+      round = r;
+      if (cur === "lobby") lobbyReady();
+      else openLobby(r);
     })
     ["catch"](function(err){
       var raw = String(err && err.message || err);
@@ -1388,9 +1508,231 @@ function cook(files){
         m = "Supabase would not take the round. Re-run the SQL from step 2.";
       else if (/not valid JSON|Unexpected token|JSON/i.test(raw))
         m = "Gemini answered with something I could not read. Usually a retry fixes it.";
+      show("cook");
       cookFail(m, raw);
     });
 }
+
+/* ============================================================
+   rooms: one round, any number of people
+   ============================================================ */
+function patchRound(id, fields){
+  if (DEMO) return Promise.resolve(fake.patch(id, fields));
+  return sb("rounds?id=eq." + encodeURIComponent(id), {
+    method: "PATCH", as: curRoom, headers: { "Prefer": "return=minimal" }, body: fields
+  });
+}
+function findRoom(room){
+  if (DEMO) return Promise.resolve(fake.byRoom(room));
+  return sb("rounds?select=*&room=eq." + encodeURIComponent(room), { as: room })
+    .then(function(r){ return r[0] || null; });
+}
+
+/* The QR carries the keys, because a guest's phone has none of its own. It is
+   scoped to this one round: the code it holds opens that round and nothing else. */
+function joinLink(row){
+  var payload = btoa(unescape(encodeURIComponent(JSON.stringify({
+    u: cfg.url, k: cfg.key, r: row.room
+  })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return location.href.split("#")[0].split("?")[0] + "#j=" + payload;
+}
+function readJoin(frag){
+  var m = /[#&]j=([A-Za-z0-9\-_]+)/.exec(frag || "");
+  if (!m) return null;
+  try {
+    var t = m[1].replace(/-/g, "+").replace(/_/g, "/");
+    while (t.length % 4) t += "=";
+    var o = JSON.parse(decodeURIComponent(escape(atob(t))));
+    if (o && o.u && o.k && o.r) return o;
+  } catch(e){}
+  return null;
+}
+
+function renderQR(link){
+  var cv = $("lobbyQR"), miss = $("lobbyQRmiss");
+  withQR(function(ok){
+    if (!ok || !window.QRCode){
+      cv.classList.add("hide"); miss.classList.remove("hide");
+      miss.textContent = "No code — use Send the link";
+      return;
+    }
+    cv.classList.remove("hide"); miss.classList.add("hide");
+    window.QRCode.toCanvas(cv, link, { width: 174, margin: 1, errorCorrectionLevel: "L",
+      color: { dark: "#16141A", light: "#ffffff" } }, function(err){
+      if (err){ cv.classList.add("hide"); miss.classList.remove("hide");
+                miss.textContent = "No code — use Send the link"; }
+    });
+  });
+}
+
+/* ---------- the lobby ---------- */
+var catsOn = {};
+
+function openLobby(row){
+  round = row;
+  curRoom = row.room;
+  $("lobbyCode").textContent = row.room || "—";
+  $("lobbyCats").classList.add("hide");
+  $("lobbyGo").classList.add("hide");
+  $("lobLede").textContent = isGuest()
+    ? "You're in. Waiting for the menu."
+    : "Anyone at the table can scan this and swipe with you.";
+  $("lobbyShare").classList.toggle("hide", isGuest());
+  document.querySelector(".qrbox").classList.toggle("hide", isGuest());
+  if (!isGuest()) renderQR(joinLink(row));
+  if (row.dishes && row.dishes.length) lobbyReady();
+  show("lobby");
+}
+
+function lobbyReady(){
+  if (isGuest()){
+    $("lobbyState").textContent = round.state === "open"
+      ? "Starting…" : "Menu is ready — waiting for the host to choose courses";
+    return;
+  }
+  var groups = [], seen = {};
+  round.dishes.forEach(function(d){
+    var k = (d.section || "Dishes").trim() || "Dishes";
+    if (!seen[k]){ seen[k] = { name: k, n: 0 }; groups.push(seen[k]); }
+    seen[k].n++;
+  });
+  if (!Object.keys(catsOn).length) groups.forEach(function(g){ catsOn[g.name] = 1; });
+
+  var h = "";
+  groups.forEach(function(g){
+    h += '<button class="cat" type="button" data-cat="' + esc(g.name) + '" ' +
+         'aria-pressed="' + (catsOn[g.name] ? "true" : "false") + '">' +
+         '<span class="box">' + (catsOn[g.name] ?
+           '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16141A" ' +
+           'stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+           '<path d="m4 12 6 6L20 6"/></svg>' : '') + '</span>' +
+         '<span class="nm">' + esc(g.name) + '</span>' +
+         '<span class="ct">' + g.n + '</span></button>';
+  });
+  $("catList").innerHTML = h;
+  [].slice.call($("catList").querySelectorAll("[data-cat]")).forEach(function(b){
+    b.addEventListener("click", function(){
+      var k = b.getAttribute("data-cat");
+      catsOn[k] = catsOn[k] ? 0 : 1;
+      lobbyReady();
+    });
+  });
+  $("lobbyCats").classList.remove("hide");
+
+  var picked = chosenSections();
+  var n = countIn(picked);
+  $("lobbyGo").textContent = n ? "Start swiping · " + n + " dishes" : "Pick at least one course";
+  $("lobbyGo").disabled = !n;
+  $("lobbyGo").classList.remove("hide");
+  $("lobbyState").textContent = "";
+}
+
+function chosenSections(){
+  return Object.keys(catsOn).filter(function(k){ return catsOn[k]; });
+}
+function countIn(secs){
+  return round.dishes.filter(function(d){
+    return secs.indexOf((d.section || "Dishes").trim() || "Dishes") >= 0;
+  }).length;
+}
+
+/* dish positions taking part in this round, in menu order */
+function activeOrder(){
+  var secs = (round && round.sections) || null;
+  var out = [];
+  (round.dishes || []).forEach(function(d, i){
+    var k = (d.section || "Dishes").trim() || "Dishes";
+    if (!secs || !secs.length || secs.indexOf(k) >= 0) out.push(i);
+  });
+  return out;
+}
+
+function renderCrowd(box){
+  var h = "";
+  crowd.forEach(function(c){
+    var mine = c.id === meId();
+    h += '<span class="who-chip' + (c.n ? "" : " idle") + '">' +
+         '<i></i>' + (mine ? '<b>' + esc(c.name) + '</b>' : esc(c.name)) +
+         (c.done ? ' ✓' : (c.n ? ' ' + c.n : '')) + '</span>';
+  });
+  if (!crowd.length) h = '<span class="who-chip idle"><i></i>nobody yet</span>';
+  box.innerHTML = h;
+}
+
+function pollLobby(){
+  function tick(){
+    Promise.all([
+      getBallots(round.id),
+      isGuest() ? findRoom(round.room) : Promise.resolve(null)
+    ]).then(function(r){
+      crowd = crowdOf(r[0], (round.dishes || []).length);
+      renderCrowd($("lobbyWho"));
+      var live = r[1];
+      if (live){
+        round.dishes = live.dishes || [];
+        round.sections = live.sections || null;
+        round.state = live.state;
+        round.place = live.place;
+        if (live.state === "open"){ stopPolls(); return startDeck(round); }
+        lobbyReady();
+      }
+    })["catch"](function(){});
+  }
+  tick();
+  pollT = setInterval(function(){ if (!document.hidden) tick(); }, 3000);
+}
+
+$("lobbyQuit").addEventListener("click", function(){ show(isGuest() ? "join" : "home"); });
+$("lobbyShare").addEventListener("click", function(){
+  var link = joinLink(round);
+  if (navigator.share) navigator.share({ title: "Cold and Sour", text: "Swipe the menu with us", url: link })["catch"](function(){});
+  else copy(link, "Join link copied");
+});
+$("lobbyGo").addEventListener("click", function(){
+  var secs = chosenSections();
+  if (!secs.length) return;
+  round.sections = secs;
+  round.state = "open";
+  patchRound(round.id, { sections: secs, state: "open" })["catch"](function(){});
+  startDeck(round);
+});
+
+/* ---------- joining as a guest ---------- */
+var pendingJoin = null;
+
+function askToJoin(o){
+  pendingJoin = o;
+  $("joinCode").textContent = o.r;
+  $("joinErr").textContent = "";
+  try { $("joinName").value = (loadCfg() && loadCfg().guest && loadCfg().guest.name) || ""; } catch(e){}
+  show("join");
+}
+
+$("joinGo").addEventListener("click", function(){
+  var nm = ($("joinName").value || "").trim();
+  if (!nm) { $("joinErr").textContent = "A name, so the others know who matched."; return; }
+  var o = pendingJoin;
+  if (!o) return;
+  var id = "g" + rndId(6);
+  var old = loadCfg();
+  if (old && old.guest && old.guest.id) id = old.guest.id;     // same phone, same person
+  saveCfg({ url: o.u, key: o.k, gkey: (old && old.gkey) || "", pair: o.r,
+            names: null, me: null, guest: { id: id, name: nm } });
+  curRoom = o.r;
+  $("joinGo").disabled = true;
+  findRoom(o.r).then(function(row){
+    $("joinGo").disabled = false;
+    if (!row){ $("joinErr").textContent = "That table is gone."; return; }
+    round = row; curRoom = row.room;
+    return putBallot(row.id, {}, false).then(function(){
+      if (row.state === "open") return startDeck(row);
+      openLobby(row);
+    });
+  })["catch"](function(){
+    $("joinGo").disabled = false;
+    $("joinErr").textContent = "Could not reach the table. Check the connection.";
+  });
+});
 
 /* ============================================================
    GO
@@ -1401,7 +1743,7 @@ function openGo(row){
   round = row;
   $("goPlace").textContent = row.place ? row.place : "The menu is ready";
   $("goCount").textContent = row.dishes.length + " dishes · " +
-    (row.shot_by === meId() ? "you took the photo" : themName() + " took the photo");
+    (row.shot_by === meId() ? "your menu" : (row.host_name || "someone") + " scanned it");
   $("goPill").textContent = row.id;
   show("go");
 }
@@ -1414,20 +1756,22 @@ $("goBtn").addEventListener("click", function(){ startDeck(round); });
 /* ============================================================
    the deck
    ============================================================ */
-var votes = {}, idx = 0, hist = [], pushT = null, lastThem = null;
+var votes = {}, idx = 0, hist = [], pushT = null;
+
+var order = [];
 
 function startDeck(row){
   round = row;
+  curRoom = row.room || curRoom;
   votes = {}; idx = 0; hist = [];
+  order = activeOrder();
+  if (!order.length){ toast("No courses were chosen."); return show(isGuest() ? "lobby" : "home"); }
   getBallots(row.id).then(function(bs){
-    bs.forEach(function(b){
-      if (b.voter === meId() && b.votes){ votes = b.votes; }
-      if (b.voter === themId()) lastThem = b;
-    });
-    // resume where I left off
+    crowd = crowdOf(bs, order.length);
+    bs.forEach(function(b){ if (b.voter === meId() && b.votes) votes = b.votes; });
     idx = 0;
-    while (idx < row.dishes.length && votes[String(idx)] !== undefined) idx++;
-    if (idx >= row.dishes.length){ finishDeck(); return; }
+    while (idx < order.length && votes[String(order[idx])] !== undefined) idx++;
+    if (idx >= order.length){ finishDeck(); return; }
     show("deck");
     renderDeck();
   })["catch"](function(){
@@ -1452,11 +1796,11 @@ function cardHTML(d, n, total){
 
 function renderDeck(){
   var box = $("deckBox");
-  var total = round.dishes.length;
+  var total = order.length;
   box.innerHTML = "";
 
   for (var k = Math.min(idx + 2, total - 1); k >= idx; k--){
-    var d = round.dishes[k];
+    var d = round.dishes[order[k]];
     var depth = k - idx;
     // every card lives in a slot that centres it, so dragging can own the card's
     // own transform without fighting the layout
@@ -1492,9 +1836,13 @@ function renderDeck(){
 }
 
 function footTally(){
-  var mine = Object.keys(votes).length;
-  var theirs = lastThem && lastThem.votes ? Object.keys(lastThem.votes).length : 0;
-  $("deckFoot").textContent = themName() + " is on " + theirs + " · you are on " + mine;
+  var rest = others();
+  if (!rest.length){ $("deckFoot").textContent = "just you so far"; return; }
+  var done = rest.filter(function(c){ return c.done; }).length;
+  if (rest.length === 1)
+    $("deckFoot").textContent = rest[0].name + (rest[0].done ? " has finished" : " is on " + rest[0].n);
+  else
+    $("deckFoot").textContent = rest.length + " others · " + done + " finished";
 }
 
 /* drag */
@@ -1546,13 +1894,13 @@ function fling(card, liked){
 }
 
 function decide(liked){
-  votes[String(idx)] = liked ? 1 : 0;
+  votes[String(order[idx])] = liked ? 1 : 0;
   hist.push(idx);
   idx++;
   pushVotes(false);
   if (navigator.vibrate) { try { navigator.vibrate(liked ? 18 : 9); } catch(e){} }
   setTimeout(function(){
-    if (idx >= round.dishes.length) finishDeck();
+    if (idx >= order.length) finishDeck();
     else renderDeck();
   }, 180);
 }
@@ -1569,7 +1917,7 @@ $("btnNo").addEventListener("click", function(){ tapDecide(false); });
 $("btnUndo").addEventListener("click", function(){
   if (!hist.length) return;
   idx = hist.pop();
-  delete votes[String(idx)];
+  delete votes[String(order[idx])];
   pushVotes(false);
   renderDeck();
 });
@@ -1605,23 +1953,25 @@ $("waitBack").addEventListener("click", function(){ show("home"); });
 $("waitPeek").addEventListener("click", function(){ openResults(true); });
 
 function pollWait(){
-  var total = round.dishes.length;
-  $("waitPill").textContent = round.id;
+  var total = order.length;
+  $("waitPill").textContent = round.room || round.id;
   $("waitTitle").textContent = "You are done";
 
   function tick(){
     getBallots(round.id).then(function(bs){
-      var them = null;
-      bs.forEach(function(b){ if (b.voter === themId()) them = b; });
-      lastThem = them;
-      var n = them && them.votes ? Object.keys(them.votes).length : 0;
-      var pc = total ? Math.round(n / total * 100) : 0;
+      crowd = crowdOf(bs, total);
+      var rest = others();
+      var done = rest.filter(function(c){ return c.done; }).length;
+      var sum = rest.reduce(function(a, c){ return a + Math.min(c.n, total); }, 0);
+      var pc = (rest.length && total) ? Math.round(sum / (rest.length * total) * 100) : 0;
       $("waitBar").style.width = pc + "%";
-      $("waitPct").textContent = n + " of " + total;
-      $("waitStep").textContent = them && them.done
-        ? themName() + " has finished too"
-        : (n === 0 ? themName() + " has not started yet" : themName() + " is on number " + n);
-      if (them && them.done){ stopPolls(); openResults(false); }
+      $("waitPct").textContent = rest.length ? done + " of " + rest.length + " finished" : "nobody else yet";
+      $("waitStep").textContent = !rest.length
+        ? "Send the link so someone can join"
+        : rest.length === 1
+          ? (rest[0].done ? rest[0].name + " has finished too" : rest[0].name + " is on " + rest[0].n + " of " + total)
+          : rest.map(function(c){ return c.name + (c.done ? " ✓" : " " + c.n); }).join(" · ");
+      if (rest.length && done === rest.length){ stopPolls(); openResults(false); }
     })["catch"](function(){ $("waitStep").textContent = "Offline… retrying"; });
   }
   tick();
@@ -1632,9 +1982,9 @@ function pollWait(){
    results
    ============================================================ */
 var NONE = [
-  "Zero matches. Order bread and reconsider the relationship.",
-  "Nothing in common. The waiter decides tonight.",
-  "Not one. That says more about you two than about the menu."
+  "Nothing in common. Order bread and reconsider the friendship.",
+  "Not a single overlap. The waiter decides tonight.",
+  "Zero. That says more about this table than about the menu."
 ];
 
 $("resHome").addEventListener("click", function(){ show("home"); });
@@ -1642,52 +1992,63 @@ $("resHome").addEventListener("click", function(){ show("home"); });
 function openResults(partial){
   stopPolls();
   getBallots(round.id).then(function(bs){
-    var mine = {}, theirs = {}, themDone = false;
-    bs.forEach(function(b){
-      if (b.voter === meId())  mine = b.votes || {};
-      if (b.voter === themId()){ theirs = b.votes || {}; themDone = !!b.done; }
-    });
-    render(mine, theirs, themDone);
+    crowd = crowdOf(bs, order.length);
+    render();
   })["catch"](function(){
     toast("I could not fetch the votes. Is there a connection?");
   });
 
-  function render(mine, theirs, themDone){
-    var both = [], onlyMe = [], onlyThem = [];
-    round.dishes.forEach(function(d, i){
-      var a = mine[String(i)] === 1, b = theirs[String(i)] === 1;
-      if (a && b) both.push(d);
-      else if (a) onlyMe.push(d);
-      else if (b) onlyThem.push(d);
+  function render(){
+    var people = crowd.length || 1;
+    var rows = [];
+    order.forEach(function(di){
+      var yes = [], no = [];
+      crowd.forEach(function(c){
+        if (c.votes[String(di)] === 1) yes.push(c.name);
+        else if (c.votes[String(di)] === 0) no.push(c.name);
+      });
+      if (yes.length) rows.push({ d: round.dishes[di], yes: yes, no: no });
     });
+    rows.sort(function(a, b){ return b.yes.length - a.yes.length; });
 
-    $("resPill").textContent = round.place ? round.place.slice(0, 18) : round.id;
-    $("resN").textContent = both.length;
-    $("resH").textContent = both.length === 1 ? "match" : "matches";
-    $("resP").textContent = both.length === 0
-      ? NONE[Math.floor(Math.random() * NONE.length)]
-      : (themDone ? "This is what you both said yes to."
-                  : themName() + " is still swiping — this is only half of it.");
+    var all = rows.filter(function(r){ return r.yes.length === people; });
+    var near = rows.filter(function(r){ return r.yes.length === people - 1 && people > 2; });
+    var rest = rows.filter(function(r){ return r.yes.length < people && !(people > 2 && r.yes.length === people - 1); });
+
+    $("resPill").textContent = round.place ? round.place.slice(0, 18) : (round.room || round.id);
+    $("resN").textContent = all.length;
+    $("resH").textContent = all.length === 1 ? "everyone wants it" : "everyone wants them";
+    $("resP").textContent = all.length
+      ? people + " at the table, " + all.length + " agreed."
+      : NONE[Math.floor(Math.random() * NONE.length)];
 
     var h = "";
-    both.forEach(function(d, i){
-      h += '<div class="hit"><span class="num">' + (i + 1) + '</span><div style="min-width:0">' +
-           '<h4>' + esc(d.name) + '</h4>' +
-           (d.note ? '<p>' + esc(d.note) + '</p>' : '') +
-           '</div>' + (d.price ? '<span class="pr">' + esc(d.price) + '</span>' : '') + '</div>';
-    });
+    all.forEach(function(r, i){ h += hit(r, i + 1, people); });
 
-    if (onlyMe.length || onlyThem.length){
-      h += '<div class="hr">only one of you</div>';
-      onlyMe.forEach(function(d){
-        h += '<div class="solo"><span class="w">' + esc(meName()) + '</span><span>' + esc(d.name) + '</span></div>';
-      });
-      onlyThem.forEach(function(d){
-        h += '<div class="solo"><span class="w">' + esc(themName()) + '</span><span>' + esc(d.name) + '</span></div>';
-      });
+    if (near.length){
+      h += '<div class="hr">all but one</div>';
+      near.forEach(function(r){ h += hit(r, null, people); });
+    }
+    if (rest.length){
+      h += '<div class="hr">' + (people > 2 ? "some of you" : "only one of you") + '</div>';
+      rest.forEach(function(r){ h += hit(r, null, people); });
     }
     $("resList").innerHTML = h;
     show("res");
+  }
+
+  function hit(r, rank, people){
+    var full = r.yes.length === people;
+    return '<div class="hit">' +
+      '<span class="num' + (full ? "" : " part") + '">' +
+        (rank || (r.yes.length + "/" + people)) + '</span>' +
+      '<div style="min-width:0">' +
+        '<h4>' + esc(r.d.name) + '</h4>' +
+        (r.d.note ? '<p>' + esc(r.d.note) + '</p>' : '') +
+        (full ? '' : '<p class="whos">' + esc(r.yes.join(", ")) + '</p>') +
+      '</div>' +
+      (r.d.price ? '<span class="pr">' + esc(r.d.price) + '</span>' : '') +
+    '</div>';
   }
 }
 
@@ -1695,12 +2056,19 @@ function openResults(partial){
    home — what is going on right now
    ============================================================ */
 function pollHome(){
-  $("homeFoot").textContent = "You are " + meName() + " · " + themName() + " on the other phone";
+  $("homeFoot").textContent = "You are " + meName();
   function tick(){
     getRounds().then(function(rows){
       if (!rows.length){ $("homeCards").innerHTML = ""; return; }
-      var ids = rows.map(function(r){ return r.id; });
-      return getBallotsFor(ids).then(function(bs){ paint(rows, bs); });
+      // ballots live under each round's room code, so they are fetched per round
+      var live = rows.slice(0, 3);
+      return Promise.all(live.map(function(r){
+        return getBallots(r.id, r.room)["catch"](function(){ return []; });
+      })).then(function(lists){
+        var bs = [];
+        lists.forEach(function(l){ bs = bs.concat(l); });
+        paint(rows, bs);
+      });
     })["catch"](function(){ /* offline: leave the last paint alone */ });
   }
   tick();
@@ -1719,7 +2087,10 @@ function skipRound(id){
   try { localStorage.setItem(SKIP_KEY, JSON.stringify(l.slice(-40))); } catch(e){}
 }
 
+var tossRoom = {};
+
 function paint(rows, ballots){
+  tossRoom = {};
   var fresh = Date.now() - 1000 * 60 * 60 * 5;   // anything older than 5h is yesterday's dinner
   var hot   = Date.now() - 1000 * 60 * 10;       // scanned just now, by the other phone
   var h = "", shown = 0, jump = null, skip = skipped();
@@ -1729,29 +2100,40 @@ function paint(rows, ballots){
     if (new Date(r.created_at).getTime() < fresh) return;
     if (skip.indexOf(r.id) >= 0) return;
 
-    var mine = null, them = null;
+    var mine = null, guests = [];
     ballots.forEach(function(b){
       if (b.round_id !== r.id) return;
       if (b.voter === meId()) mine = b;
-      if (b.voter === themId()) them = b;
+      else guests.push(b);
     });
-    var total = (r.dishes || []).length;
+    var total = (r.sections && r.sections.length)
+      ? (r.dishes || []).filter(function(d){
+          return r.sections.indexOf((d.section || "Dishes").trim() || "Dishes") >= 0; }).length
+      : (r.dishes || []).length;
     var myN = mine && mine.votes ? Object.keys(mine.votes).length : 0;
-    var theirN = them && them.votes ? Object.keys(them.votes).length : 0;
+    var doneN = guests.filter(function(b){ return b.done; }).length;
     var where = r.place || "A menu with no name";
+    tossRoom[r.id] = r.room || null;
 
     var kicker, title, line, label;
-    if (mine && mine.done && them && them.done){
-      kicker = "ready"; title = where;
-      line = "You have both finished."; label = "See the matches";
+    if (r.state === "reading" || !total){
+      kicker = "reading"; title = where;
+      line = "Still working out the dishes."; label = "Open the table";
+    } else if (r.state === "choosing" && r.shot_by === meId()){
+      kicker = "your table"; title = where;
+      line = (r.dishes || []).length + " dishes found — pick the courses."; label = "Choose courses";
     } else if (mine && mine.done){
-      kicker = "waiting"; title = where;
-      line = themName() + " is on " + theirN + " of " + total + "."; label = "See how it is going";
+      kicker = guests.length && doneN === guests.length ? "ready" : "waiting";
+      title = where;
+      line = guests.length
+        ? doneN + " of " + guests.length + " others finished."
+        : "Nobody else has joined yet.";
+      label = guests.length && doneN === guests.length ? "See the matches" : "See how it is going";
     } else if (myN > 0){
       kicker = "half done"; title = where;
-      line = (total - myN) + " dishes left."; label = "Keep swiping";
+      line = Math.max(0, total - myN) + " dishes left."; label = "Keep swiping";
     } else {
-      kicker = r.shot_by === meId() ? "your menu" : themName() + " scanned a menu";
+      kicker = r.shot_by === meId() ? "your menu" : (r.host_name || "someone") + " scanned a menu";
       title = where;
       line = total + " dishes waiting."; label = "GO";
       if (r.shot_by !== meId() && new Date(r.created_at).getTime() > hot) jump = r;
@@ -1792,7 +2174,7 @@ function paint(rows, ballots){
         var id = btn.getAttribute("data-toss");
         skipRound(id);                       // so the poll cannot re-open it
         btn.closest(".card-note").remove();
-        dropRound(id).then(function(){ toast("Menu binned"); })
+        dropRound(id, (tossRoom[id] || null)).then(function(){ toast("Menu binned"); })
           ["catch"](function(){ toast("Could not delete it — it may come back."); });
       });
     });
@@ -1802,16 +2184,24 @@ function paint(rows, ballots){
 function openRound(id){
   getRound(id).then(function(row){
     if (!row) return toast("That round is gone.");
-    return getBallots(id).then(function(bs){
-      var mine = null, them = null;
+    curRoom = row.room || null;
+    return getBallots(id, row.room).then(function(bs){
+      var mine = null, rest = [];
       bs.forEach(function(b){
-        if (b.voter === meId()) mine = b;
-        if (b.voter === themId()) them = b;
+        if (b.voter === meId()) mine = b; else rest.push(b);
       });
-      round = row; lastThem = them;
+      round = row; curRoom = row.room || null;
+      crowd = crowdOf(bs, (row.dishes || []).length);
+      // a table still being set up belongs in the lobby, not the deck
+      if (row.state === "reading" || row.state === "choosing" || !(row.dishes || []).length){
+        catsOn = {};
+        return openLobby(row);
+      }
+      order = activeOrder();
       if (mine && mine.done){
         votes = mine.votes || {};
-        if (them && them.done) openResults(false); else show("wait");
+        var allIn = rest.length && rest.every(function(b){ return b.done; });
+        if (allIn) openResults(false); else show("wait");
       } else if (mine && Object.keys(mine.votes || {}).length){
         startDeck(row);
       } else {
@@ -2163,6 +2553,29 @@ function boot(){
   var standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
                    navigator.standalone === true;
 
+  // A QR from someone else's table: ask for a name, then in you go. This never
+  // touches a host's own setup — a guest keeps no Gemini key and scans nothing.
+  var invite = readJoin(location.hash);
+  if (invite){
+    if (standalone) history.replaceState(null, "", location.pathname + location.search);
+    askToJoin(invite);
+    return;
+  }
+
+  // a guest reopening the app goes back to the table they were at
+  if (cfg && isGuest()){
+    curRoom = cfg.pair;
+    findRoom(cfg.pair).then(function(row){
+      if (!row) return askToJoin({ u: cfg.url, k: cfg.key, r: cfg.pair });
+      round = row; curRoom = row.room;
+      order = activeOrder();
+      if (row.state === "open") startDeck(row); else openLobby(row);
+    })["catch"](function(){
+      askToJoin({ u: cfg.url, k: cfg.key, r: cfg.pair });
+    });
+    return;
+  }
+
   var incoming = readPair(location.hash);
   // opening the other person's link on this phone also corrects who it thinks it is
   if (incoming && (!cfg || cfg.pair !== incoming.p ||
@@ -2188,7 +2601,7 @@ function boot(){
 // a pairing link pasted into the address bar while the app is already open only
 // changes the hash, which reloads nothing — pick it up by hand
 window.addEventListener("hashchange", function(){
-  if (readPair(location.hash)) boot();
+  if (readPair(location.hash) || readJoin(location.hash)) boot();
 });
 
 if ("serviceWorker" in navigator){
