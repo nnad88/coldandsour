@@ -1169,45 +1169,67 @@ function countdown(label, ms){
 /* ============================================================
    photo -> downsized jpeg base64
    ============================================================ */
+/* Two decoders, because they fail on different things. createImageBitmap hands
+   the file to the platform decoder directly and copes with photos the <img>
+   pipeline gives up on — a 50-megapixel camera shot, say — while <img> covers
+   anything without it. Only when both refuse is a file really undecodable. */
+function decodeImage(file){
+  function viaImg(){
+    return new Promise(function(res, rej){
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function(){ res({ el: img, w: img.naturalWidth, h: img.naturalHeight,
+                                     free: function(){ URL.revokeObjectURL(url); } }); };
+      img.onerror = function(){
+        URL.revokeObjectURL(url);
+        rej(new Error("both decoders refused it"));
+      };
+      img.src = url;
+    });
+  }
+  if (typeof createImageBitmap === "function"){
+    try {
+      return createImageBitmap(file).then(function(bm){
+        return { el: bm, w: bm.width, h: bm.height,
+                 free: function(){ try { bm.close(); } catch(e){} } };
+      })["catch"](viaImg);
+    } catch(e){ return viaImg(); }
+  }
+  return viaImg();
+}
+
 function shrink(file, maxDim){
-  return new Promise(function(res, rej){
-    var url = URL.createObjectURL(file);
-    var img = new Image();
-    img.onload = function(){
-      var w = img.naturalWidth, h = img.naturalHeight;
-      var s = Math.min(1, maxDim / Math.max(w, h));
+  return decodeImage(file).then(function(src){
+    var w = src.w, h = src.h;
+    if (!w || !h){ src.free(); throw new Error("the image had no size"); }
+    var s = Math.min(1, maxDim / Math.max(w, h));
 
-      // What the model charges for is AREA, not the longest edge. A camera photo
-      // is 4000x3000, so capping the long side at 1800 still left 2.4 megapixels,
-      // while a screenshot of the same menu came out at 1.7 — the camera was
-      // quietly the slow one. Cap the area instead.
-      var MP = 1.6 * 1000000;
-      if (w * h * s * s > MP) s = Math.sqrt(MP / (w * h));
+    // What the model charges for is AREA, not the longest edge. A camera photo
+    // is 4000x3000, so capping the long side at 1800 still left 2.4 megapixels,
+    // while a screenshot of the same menu came out at 1.7 — the camera was
+    // quietly the slow one. Cap the area instead.
+    var MP = 1.6 * 1000000;
+    if (w * h * s * s > MP) s = Math.sqrt(MP / (w * h));
 
-      // A screenshot is long and narrow, so neither cap must be allowed to crush
-      // the short side: below ~900px a dense menu stops being legible.
-      if (Math.min(w, h) * s < 900) s = Math.min(1, 900 / Math.min(w, h));
-      var cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
-      var cv = document.createElement("canvas");
-      cv.width = cw; cv.height = ch;
-      var cx = cv.getContext("2d");
-      cx.fillStyle = "#fff"; cx.fillRect(0, 0, cw, ch);
-      cx.drawImage(img, 0, 0, cw, ch);
-      URL.revokeObjectURL(url);
-      try {
-        var d = cv.toDataURL("image/jpeg", 0.82);
-        // a canvas past the phone's memory ceiling yields "data:," instead of throwing
-        if (!d || d.indexOf("data:image/jpeg") !== 0 || d.length < 2000)
-          return rej(new Error("This phone ran out of room encoding that photo. Try fewer pages at once."));
-        res(d.split(",")[1]);
-      }
-      catch(e){ rej(new Error("I could not read that photo.")); }
-    };
-    img.onerror = function(){
-      URL.revokeObjectURL(url);
-      rej(new Error("the browser's decoder refused it"));
-    };
-    img.src = url;
+    // A screenshot is long and narrow, so neither cap must be allowed to crush
+    // the short side: below ~900px a dense menu stops being legible.
+    if (Math.min(w, h) * s < 900) s = Math.min(1, 900 / Math.min(w, h));
+
+    var cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
+    var cv = document.createElement("canvas");
+    cv.width = cw; cv.height = ch;
+    var cx = cv.getContext("2d");
+    cx.fillStyle = "#fff"; cx.fillRect(0, 0, cw, ch);
+    cx.drawImage(src.el, 0, 0, cw, ch);
+    src.free();
+
+    var d;
+    try { d = cv.toDataURL("image/jpeg", 0.82); }
+    catch(e){ throw new Error("the canvas would not encode it"); }
+    // a canvas past the phone's memory ceiling yields "data:," instead of throwing
+    if (!d || d.indexOf("data:image/jpeg") !== 0 || d.length < 2000)
+      throw new Error("this phone ran out of room encoding it");
+    return d.split(",")[1];
   });
 }
 
@@ -1306,9 +1328,9 @@ function prepare(file){
             throw new Error("That is a " + real.split("/")[1].toUpperCase() +
                             ", which this phone cannot open and Gemini will not read — " +
                             describe(file) + ". A screenshot of it will work.");
-          if (file.size > 6 * 1048576)
+          if (file.size > 12 * 1048576)
             throw new Error("That file is " + (file.size / 1048576).toFixed(1) +
-              " MB and this phone cannot shrink it. A screenshot of it will work.");
+              " MB and this phone cannot shrink it. A screenshot of it will be smaller.");
           return fileB64(file).then(function(b64){ return { mime: real, data: b64 }; });
         });
     });
