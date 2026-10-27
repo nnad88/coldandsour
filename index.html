@@ -14,6 +14,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="qr.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
 <style>
 :root{
@@ -341,6 +342,9 @@ input,textarea{font-family:inherit;font-size:16px}
          picker, where a whole menu can be selected in one go. Its camera entry is
          not redundant any more — this is the only photo button. -->
     <input type="file" id="pickIn" accept="image/*,application/pdf" multiple class="hide">
+    <!-- capture goes straight to the camera: shooting page after page of a long
+         menu should not mean walking through the picker every time -->
+    <input type="file" id="shotIn" accept="image/*" capture="environment" class="hide">
   </div>
 
   <p class="foot" id="homeFoot">You are —</p>
@@ -356,7 +360,8 @@ input,textarea{font-family:inherit;font-size:16px}
      Pick several at once. They are read together, in this order.</p>
   <div class="thumbs" id="thumbs"></div>
   <div class="trayAdd">
-    <button class="ghost" id="trayPick">Add more pages</button>
+    <button class="ghost" id="trayShoot">Take another</button>
+    <button class="ghost" id="trayPick">From photos</button>
   </div>
   <button class="big" id="trayGo" style="margin-top:10px">Read the menu</button>
   <p class="foot" id="trayFoot">—</p>
@@ -1380,6 +1385,7 @@ function took(e){
 
 $("trayBack").addEventListener("click", function(){ clearTray(); show("home"); });
 $("trayPick").addEventListener("click", function(){ $("pickIn").click(); });
+$("trayShoot").addEventListener("click", function(){ $("shotIn").click(); });
 $("trayGo").addEventListener("click", function(){
   if (!tray.length) return;
   var files = tray.map(function(t){ return t.file; });
@@ -1392,6 +1398,7 @@ $("shootBtn").addEventListener("click", function(){
   $("pickIn").click();
 });
 $("pickIn").addEventListener("change", took);
+$("shotIn").addEventListener("change", took);
 
 // on a laptop the menu is usually already on the clipboard
 window.addEventListener("paste", function(e){
@@ -1530,17 +1537,36 @@ function findRoom(room){
 
 /* The QR carries the keys, because a guest's phone has none of its own. It is
    scoped to this one round: the code it holds opens that round and nothing else. */
+var JWT_HEAD = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.";
+
+/* Every character here costs symbol size, and symbol size costs scannability:
+   the old base64 blob needed a 65x65 code, which at thumbnail size leaves two
+   pixels per module. Sending the project ref instead of the whole URL, and
+   dropping the JWT header every Supabase key shares, gets it to 53x53. */
 function joinLink(row){
-  var payload = btoa(unescape(encodeURIComponent(JSON.stringify({
-    u: cfg.url, k: cfg.key, r: row.room
-  })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  return location.href.split("#")[0].split("?")[0] + "#j=" + payload;
+  var m = /^https:\/\/([a-z0-9-]+)\.supabase\.co$/i.exec(cfg.url || "");
+  var ref = m ? m[1] : "!" + cfg.url;
+  var key = (cfg.key || "").indexOf(JWT_HEAD) === 0 ? cfg.key.slice(JWT_HEAD.length) : "!" + cfg.key;
+  return location.href.split("#")[0].split("?")[0] + "#j=" +
+         ref + "~" + row.room + "~" + key;
 }
+
 function readJoin(frag){
-  var m = /[#&]j=([A-Za-z0-9\-_]+)/.exec(frag || "");
+  var m = /[#&]j=([^&]+)/.exec(frag || "");
   if (!m) return null;
-  try {
-    var t = m[1].replace(/-/g, "+").replace(/_/g, "/");
+  var raw = m[1];
+  if (raw.indexOf("~") > 0){
+    var bits = raw.split("~");
+    if (bits.length < 3) return null;
+    var ref = bits[0], room = bits[1], key = bits.slice(2).join("~");
+    return {
+      u: ref.charAt(0) === "!" ? ref.slice(1) : "https://" + ref + ".supabase.co",
+      k: key.charAt(0) === "!" ? key.slice(1) : JWT_HEAD + key,
+      r: room
+    };
+  }
+  try {                                   // links handed out before the short form
+    var t = raw.replace(/-/g, "+").replace(/_/g, "/");
     while (t.length % 4) t += "=";
     var o = JSON.parse(decodeURIComponent(escape(atob(t))));
     if (o && o.u && o.k && o.r) return o;
@@ -1550,19 +1576,11 @@ function readJoin(frag){
 
 function renderQR(link){
   var cv = $("lobbyQR"), miss = $("lobbyQRmiss");
-  withQR(function(ok){
-    if (!ok || !window.QRCode){
-      cv.classList.add("hide"); miss.classList.remove("hide");
-      miss.textContent = "No code — use Send the link";
-      return;
-    }
-    cv.classList.remove("hide"); miss.classList.add("hide");
-    window.QRCode.toCanvas(cv, link, { width: 174, margin: 1, errorCorrectionLevel: "L",
-      color: { dark: "#16141A", light: "#ffffff" } }, function(err){
-      if (err){ cv.classList.add("hide"); miss.classList.remove("hide");
-                miss.textContent = "No code — use Send the link"; }
-    });
-  });
+  var ok = false;
+  try { ok = window.CasQR && window.CasQR.toCanvas(cv, link, 186); } catch(e){ ok = false; }
+  cv.classList.toggle("hide", !ok);
+  miss.classList.toggle("hide", !!ok);
+  if (!ok) miss.textContent = "No code — use Send the link";
 }
 
 /* ---------- the lobby ---------- */
@@ -2338,16 +2356,6 @@ function installHint(){
 /* ============================================================
    settings
    ============================================================ */
-/* the QR encoder is only ever needed on the settings screen, so it is fetched
-   the first time that screen opens, and the links still work without it */
-function withQR(cb){
-  if (window.QRCode) return cb(true);
-  var s = document.createElement("script");
-  s.src = "https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js";
-  s.onload = function(){ cb(!!window.QRCode); };
-  s.onerror = function(){ cb(false); };
-  document.head.appendChild(s);
-}
 
 function renderPairCards(){
   var box = $("pairCards");
@@ -2368,16 +2376,10 @@ function renderPairCards(){
     });
     box.appendChild(card);
 
-    withQR(function(ok){
-      var cv = card.querySelector("canvas");
-      if (!ok || !cv){ if (cv) cv.outerHTML = '<div class="qrmiss">(no code — use the link below)</div>'; return; }
-      window.QRCode.toCanvas(cv, link, {
-        width: 196, margin: 1, errorCorrectionLevel: "L",
-        color: { dark: "#16141A", light: "#ffffff" }
-      }, function(err){
-        if (err) cv.outerHTML = '<div class="qrmiss">(no code — use the link below)</div>';
-      });
-    });
+    var qc = card.querySelector("canvas");
+    var drew = false;
+    try { drew = window.CasQR && window.CasQR.toCanvas(qc, link, 196); } catch(e){ drew = false; }
+    if (!drew) qc.outerHTML = '<div class="qrmiss">(no code — use the link below)</div>';
   });
 }
 
