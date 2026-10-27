@@ -242,6 +242,13 @@ input,textarea{font-family:inherit;font-size:16px}
   background:var(--ink);color:#fff;padding:12px 18px;border-radius:999px;font-size:13.5px;
   font-weight:600;z-index:60;max-width:88vw;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.3)}
 .hide{display:none !important}
+/* a guest has no camera, no keys and no table of their own to run */
+body.is-guest #gearBtn,
+body.is-guest #lobbyQuit,
+body.is-guest #lobbyCats,
+body.is-guest #lobbyGo,
+body.is-guest #lobbyBarWrap,
+body.is-guest #lobbyPct{display:none !important}
 
 /* pairing cards in settings */
 .pcard{border:2px solid var(--hair);border-radius:15px;padding:15px;margin-top:12px;
@@ -632,7 +639,16 @@ function copy(text, ok){
 }
 
 var cur = "";
+/* A guest came in through a QR someone else owns. They have no keys, no menu to
+   scan and no rounds of their own, so the screens that run the table are not
+   theirs to reach — not by a stray button, not by a back gesture. One guard,
+   rather than trusting every caller to remember. */
+var HOST_ONLY = { home: 1, tray: 1, cook: 1, set: 1, setup: 1, go: 1 };
+
 function show(name){
+  document.body.classList.toggle("is-guest", isGuest());
+  if (typeof labelBacks === "function") labelBacks();
+  if (isGuest() && HOST_ONLY[name]) name = round ? "lobby" : "join";
   var all = document.querySelectorAll(".scr");
   for (var i = 0; i < all.length; i++) all[i].classList.remove("on");
   $("s-" + name).classList.add("on");
@@ -1452,7 +1468,7 @@ $("shotIn").addEventListener("change", took);
 
 // on a laptop the menu is usually already on the clipboard
 window.addEventListener("paste", function(e){
-  if ((cur !== "home" && cur !== "tray") || DEMO) return;
+  if ((cur !== "home" && cur !== "tray") || DEMO || isGuest()) return;
   var files = [].slice.call((e.clipboardData && e.clipboardData.files) || []);
   if (!files.filter(looksLikeImage).length) return;
   e.preventDefault();
@@ -1767,7 +1783,7 @@ function pollLobby(){
   pollT = setInterval(function(){ if (!document.hidden) tick(); }, 3000);
 }
 
-$("lobbyQuit").addEventListener("click", function(){ show(isGuest() ? "join" : "home"); });
+$("lobbyQuit").addEventListener("click", function(){ show("home"); });
 $("lobbyGo").addEventListener("click", function(){
   var secs = chosenSections();
   if (!secs.length) return;
@@ -2028,7 +2044,7 @@ function finishDeck(){
 var pollT = null;
 function stopPolls(){ clearInterval(pollT); pollT = null; }
 
-$("waitBack").addEventListener("click", function(){ show("home"); });
+$("waitBack").addEventListener("click", function(){ show(isGuest() ? "lobby" : "home"); });
 $("waitPeek").addEventListener("click", function(){ openResults(true); });
 
 function pollWait(){
@@ -2066,7 +2082,13 @@ var NONE = [
   "Zero. That says more about this table than about the menu."
 ];
 
-$("resHome").addEventListener("click", function(){ show("home"); });
+$("resHome").addEventListener("click", function(){ show(isGuest() ? "lobby" : "home"); });
+function labelBacks(){
+  var t = isGuest() ? "← table" : "← home";
+  $("resHome").textContent = t;
+  $("waitBack").textContent = isGuest() ? "Back to the table" : "Back to the start";
+  $("deckQuit").textContent = isGuest() ? "← table" : "← quit";
+}
 
 function openResults(partial){
   stopPolls();
