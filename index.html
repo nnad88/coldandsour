@@ -112,6 +112,11 @@ input,textarea{font-family:inherit;font-size:16px}
   height:clamp(94px,25vw,116px);flex:none;border-radius:999px;background:#fff;
   display:grid;place-items:center;box-shadow:0 14px 34px rgba(120,10,40,.32)}
 .shoot:active{transform:scale(.96)}
+.pick{margin-top:16px;display:inline-flex;align-items:center;gap:8px;flex:none;
+  background:rgba(0,0,0,.2);color:#fff;border-radius:999px;padding:12px 20px;
+  font-size:14px;font-weight:600;letter-spacing:-.005em}
+.pick:active{transform:translateY(1px)}
+.pick svg{opacity:.85}
 .card-note{position:relative;background:rgba(0,0,0,.24);border-radius:18px;padding:14px;
   margin-bottom:9px;text-align:left;flex:none}
 .toss{position:absolute;right:9px;top:9px;width:30px;height:30px;border-radius:999px;
@@ -244,6 +249,7 @@ input,textarea{font-family:inherit;font-size:16px}
 .hide{display:none !important}
 /* a guest has no camera, no keys and no table of their own to run */
 body.is-guest #gearBtn,
+body.is-guest #pickBtn,
 body.is-guest #lobbyQuit,
 body.is-guest #lobbyCats,
 body.is-guest #lobbyGo,
@@ -336,7 +342,7 @@ body.is-guest #lobbyPct{display:none !important}
 
   <div class="hero">
     <h1>What the <em>hell</em><br>do we order?</h1>
-    <p>Shoot the menu or pick a screenshot. I turn it into cards you can swipe.</p>
+    <p>Shoot the menu, or pick photos you already have. I turn it into cards you can swipe.</p>
     <button class="shoot" id="shootBtn" aria-label="Photograph the menu">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#16141A" stroke-width="1.9"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -346,6 +352,15 @@ body.is-guest #lobbyPct{display:none !important}
     </button>
     <!-- two inputs on purpose: capture="environment" opens the camera and hides the
          gallery entirely, so a saved screenshot needs an input without it -->
+    <button class="pick" id="pickBtn">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4.5" width="18" height="15" rx="2.5"/>
+        <circle cx="8.5" cy="10" r="1.6"/>
+        <path d="m4 17 4.8-4.4a1.6 1.6 0 0 1 2.2 0L15 16m0 0 1.6-1.5a1.6 1.6 0 0 1 2.2 0L20 16"/>
+      </svg>
+      Pick from photos
+    </button>
     <!-- image/* rather than a type list: the list sends Android to a document
          picker that takes one file at a time, while image/* opens the photo
          picker, where a whole menu can be selected in one go. Its camera entry is
@@ -1269,19 +1284,33 @@ function prepare(file){
   return shrink(file, 1800)
     .then(function(b64){ return { mime: "image/jpeg", data: b64 }; })
     ["catch"](function(err){
-      return sniff(file).then(function(real){
-        if (!real)
-          throw new Error("That file is not an image I can recognise — " + describe(file) +
-                          ". (Decoder said: " + (err && err.message || err) + ")");
-        if (!GEMINI_TAKES[real])
-          throw new Error("That is a " + real.split("/")[1].toUpperCase() +
-                          ", which this phone cannot open and Gemini will not read — " +
-                          describe(file) + ". A screenshot of it will work.");
-        if (file.size > 6 * 1048576)
-          throw new Error("That file is " + (file.size / 1048576).toFixed(1) +
-            " MB and this phone cannot shrink it. A screenshot of it will work.");
-        return fileB64(file).then(function(b64){ return { mime: real, data: b64 }; });
-      });
+      return Promise.all([sniff(file), head(file, 12)["catch"](function(){ return null; })])
+        .then(function(r){
+          var real = r[0], bytes = r[1];
+          var told = (file.type || "").toLowerCase();
+
+          // Byte sniffing is the best guess, not the only one. When it comes up
+          // empty, the type the picker gave is still worth believing — refusing a
+          // file the phone itself calls a photo helps nobody.
+          if (!real && GEMINI_TAKES[told]) real = told;
+          if (!real && /^image\//.test(told)) real = "image/jpeg";
+
+          if (!real){
+            var hex = bytes ? [].slice.call(bytes).map(function(b){
+              return ("0" + b.toString(16)).slice(-2); }).join(" ") : "unreadable";
+            throw new Error("I cannot tell what that file is — " + describe(file) +
+                            " — first bytes: " + hex +
+                            ". (Decoder said: " + (err && err.message || err) + ")");
+          }
+          if (!GEMINI_TAKES[real])
+            throw new Error("That is a " + real.split("/")[1].toUpperCase() +
+                            ", which this phone cannot open and Gemini will not read — " +
+                            describe(file) + ". A screenshot of it will work.");
+          if (file.size > 6 * 1048576)
+            throw new Error("That file is " + (file.size / 1048576).toFixed(1) +
+              " MB and this phone cannot shrink it. A screenshot of it will work.");
+          return fileB64(file).then(function(b64){ return { mime: real, data: b64 }; });
+        });
     });
 }
 
@@ -1460,6 +1489,10 @@ $("trayGo").addEventListener("click", function(){
 });
 
 $("shootBtn").addEventListener("click", function(){
+  if (DEMO) return cookDemo();
+  $("shotIn").click();
+});
+$("pickBtn").addEventListener("click", function(){
   if (DEMO) return cookDemo();
   $("pickIn").click();
 });
