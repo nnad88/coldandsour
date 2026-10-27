@@ -61,8 +61,29 @@ create policy "pair or room" on public.ballots
   with check (pair = current_setting('request.headers', true)::json ->> 'x-pair'
            or room = current_setting('request.headers', true)::json ->> 'x-pair');
 
+-- IMPORTANT, two ways this silently does nothing:
+--   1. The SQL editor runs only the SELECTED text when there is a selection.
+--      Click once in the editor and press Run with nothing highlighted.
+--   2. Run it on the project the app actually talks to. The connection test in
+--      the app's settings prints that project's URL.
+-- The last statement below prints what the database ended up with, so you can
+-- see it worked instead of hoping.
+
 -- PostgREST serves the API from a cached copy of the schema, and adding columns
 -- does not always make it look again — the API then answers PGRST204, "could not
 -- find the 'state' column", about a column that plainly exists. This tells it to
 -- read the schema afresh, and is why this file is safe and useful to re-run.
 notify pgrst, 'reload schema';
+
+-- ---- proof --------------------------------------------------------------
+-- After Run, the results pane should show "ready" twice. Anything else means
+-- the statements above did not take effect on this project.
+select t.table_name,
+       case when count(*) filter (where c.column_name = 'room') = 1
+             and count(*) filter (where c.column_name in ('sections','state','name')) >= 1
+            then 'ready' else 'MISSING COLUMNS' end as status,
+       string_agg(c.column_name, ', ' order by c.column_name) as columns
+from (values ('rounds'), ('ballots')) as t(table_name)
+left join information_schema.columns c
+       on c.table_schema = 'public' and c.table_name = t.table_name
+group by t.table_name;

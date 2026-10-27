@@ -168,6 +168,8 @@ input,textarea{font-family:inherit;font-size:16px}
 .cat .ct{font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.66);flex:none}
 #lobbyFootArea{flex:none;padding-top:10px}
 #lobbyFootArea .step{text-align:center;padding-bottom:8px}
+#lobbyFootArea .bar{margin:0 auto 8px;max-width:300px}
+#lobbyFootArea .pct{text-align:center;padding-bottom:10px}
 
 /* ---------- cooking ---------- */
 .cook{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
@@ -403,7 +405,6 @@ input,textarea{font-family:inherit;font-size:16px}
   <div class="lob">
     <p class="lobLede" id="lobLede">Anyone at the table can scan this and swipe with you.</p>
     <div class="qrbox"><canvas id="lobbyQR"></canvas><div class="qrmiss hide" id="lobbyQRmiss"></div></div>
-    <button class="ghost" id="lobbyShare">Send the link instead</button>
 
     <div class="who-list" id="lobbyWho"></div>
 
@@ -415,6 +416,8 @@ input,textarea{font-family:inherit;font-size:16px}
 
   <div id="lobbyFootArea">
     <div class="step" id="lobbyState">Reading the menu…</div>
+    <div class="bar hide" id="lobbyBarWrap"><i id="lobbyBar"></i></div>
+    <div class="pct hide" id="lobbyPct">0%</div>
     <button class="big hide" id="lobbyGo">Start swiping</button>
   </div>
 </section>
@@ -1466,6 +1469,10 @@ function cook(files){
   putBallot(row.id, {}, false)["catch"](function(){});   // the host is at the table too
   openLobby(row);
   $("lobbyState").textContent = "Reading the menu…";
+  $("lobbyBarWrap").classList.remove("hide");
+  $("lobbyPct").classList.remove("hide");
+  barStart($("lobbyBar"), $("lobbyPct"));
+  barTo(4);
 
   Promise.all(files.map(prepare))
     .then(function(imgs){
@@ -1492,6 +1499,11 @@ function cook(files){
       clearInterval(cookT);
       clearTray();
       round = r;
+      barTo(100); barDone();
+      setTimeout(function(){
+        $("lobbyBarWrap").classList.add("hide");
+        $("lobbyPct").classList.add("hide");
+      }, 320);
       if (cur === "lobby") lobbyReady();
       else openLobby(r);
     })
@@ -1601,6 +1613,8 @@ var catsOn = {};
 
 function openLobby(row){
   round = row;
+  $("lobbyBarWrap").classList.add("hide");
+  $("lobbyPct").classList.add("hide");
   curRoom = row.room;
   $("lobbyCode").textContent = row.room || "—";
   $("lobbyCats").classList.add("hide");
@@ -1608,7 +1622,6 @@ function openLobby(row){
   $("lobLede").textContent = isGuest()
     ? "You're in. Waiting for the menu."
     : "Anyone at the table can scan this and swipe with you.";
-  $("lobbyShare").classList.toggle("hide", isGuest());
   document.querySelector(".qrbox").classList.toggle("hide", isGuest());
   if (!isGuest()) renderQR(joinLink(row));
   if (row.dishes && row.dishes.length) lobbyReady();
@@ -1714,11 +1727,6 @@ function pollLobby(){
 }
 
 $("lobbyQuit").addEventListener("click", function(){ show(isGuest() ? "join" : "home"); });
-$("lobbyShare").addEventListener("click", function(){
-  var link = joinLink(round);
-  if (navigator.share) navigator.share({ title: "Cold and Sour", text: "Swipe the menu with us", url: link })["catch"](function(){});
-  else copy(link, "Join link copied");
-});
 $("lobbyGo").addEventListener("click", function(){
   var secs = chosenSections();
   if (!secs.length) return;
