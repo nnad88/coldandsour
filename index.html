@@ -1438,6 +1438,31 @@ function looksLikeImage(f){
   return !t || /\.(jpe?g|png|webp|gif|heic|heif|bmp|avif|pdf)$/i.test(f.name || "");
 }
 
+/* Android hands a picked photo over as a temporary grant on a content URI, and
+   the tray can sit for minutes before anyone taps Read — by which time the
+   grant can be gone, or the photo may live only in Google Photos and have no
+   bytes on the phone at all. That is what "would not hand over" was: the file
+   was fine when chosen and unreadable by the time we asked. So take a copy the
+   moment it is chosen, while it is certainly readable, and work from that. */
+function intern(f){
+  var read = f.arrayBuffer ? f.arrayBuffer() : new Promise(function(res, rej){
+    var fr = new FileReader();
+    fr.onload = function(){ res(fr.result); };
+    fr.onerror = function(){ rej(new Error("unreadable")); };
+    fr.readAsArrayBuffer(f);
+  });
+  return read.then(function(buf){
+    if (!buf || !buf.byteLength) throw new Error("empty");
+    var type = f.type || "application/octet-stream";
+    try { return new File([buf], f.name || "photo", { type: type }); }
+    catch(e){
+      var b = new Blob([buf], { type: type });
+      b.name = f.name || "photo";
+      return b;
+    }
+  });
+}
+
 function addFiles(list){
   var all = [].slice.call(list || []);
   var files = all.filter(looksLikeImage);
@@ -1450,9 +1475,26 @@ function addFiles(list){
     files = files.slice(0, room);
     toast("Room for " + room + " more, so I kept the first " + room + ".");
   }
-  files.forEach(function(f){ tray.push({ file: f, url: URL.createObjectURL(f) }); });
-  renderTray();
-  show("tray");
+
+  Promise.all(files.map(function(f){
+    return intern(f).then(
+      function(copy){ return { ok: true, f: copy }; },
+      function(){ return { ok: false, name: f.name || "that photo" }; }
+    );
+  })).then(function(rs){
+    var good = [], bad = [];
+    rs.forEach(function(r){ (r.ok ? good : bad).push(r); });
+    good.forEach(function(r){ tray.push({ file: r.f, url: URL.createObjectURL(r.f) }); });
+    if (bad.length)
+      toast(bad.length === 1
+        ? "Could not read " + bad[0].name + ". If it only lives in Google Photos, " +
+          "open it there once so it downloads."
+        : bad.length + " photos would not open. If they only live in Google Photos, " +
+          "open them there once so they download.");
+    if (!good.length) return;
+    renderTray();
+    show("tray");
+  });
 }
 
 function clearTray(){
