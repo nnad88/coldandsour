@@ -341,7 +341,11 @@ input,textarea{font-family:inherit;font-size:16px}
          picker that takes one file at a time, while image/* opens the photo
          picker, where a whole menu can be selected in one go. Its camera entry is
          not redundant any more — this is the only photo button. -->
-    <input type="file" id="pickIn" accept="image/*,application/pdf" multiple class="hide">
+    <!-- accept is image/* and nothing else. Adding application/pdf makes Android
+         hand the input to the document picker, which takes one file at a time;
+         plain image/* opens the photo carousel, where several can be tapped.
+         A PDF menu still works — it just arrives by sharing or pasting. -->
+    <input type="file" id="pickIn" accept="image/*" multiple class="hide">
     <!-- capture goes straight to the camera: shooting page after page of a long
          menu should not mean walking through the picker every time -->
     <input type="file" id="shotIn" accept="image/*" capture="environment" class="hide">
@@ -1511,8 +1515,13 @@ function cook(files){
         m = "Gemini refused to answer on that image. Try a straighter, closer shot.";
       else if (/Failed to fetch|NetworkError|ERR_|load failed/i.test(raw))
         m = "The request never landed. Check the connection and try again.";
-      else if (/relation .* does not exist|PGRST|row-level security/i.test(raw))
-        m = "Supabase would not take the round. Re-run the SQL from step 2.";
+      else if (/does not exist|PGRST|schema cache/i.test(raw))
+        m = "Supabase does not have the new columns yet — run the SQL from settings " +
+            "step 2 on the project this phone is pointed at, then try again. " +
+            "The connection test in settings says exactly what is missing.";
+      else if (/row-level security|violates/i.test(raw))
+        m = "Supabase refused the write. Re-run the SQL from settings step 2 so the " +
+            "access rules match this version.";
       else if (/not valid JSON|Unexpected token|JSON/i.test(raw))
         m = "Gemini answered with something I could not read. Usually a retry fixes it.";
       show("cook");
@@ -2447,8 +2456,40 @@ function probe(model, cfgName, gen){
   });
 }
 
+/* The schema moved when rounds became rooms, and "re-run the SQL" is a useless
+   thing to tell someone who believes they already did. Ask the database which
+   columns it actually has and name the missing ones. */
+var NEED = { rounds: ["id","pair","room","place","dishes","sections","state","shot_by","host_name","created_at"],
+             ballots: ["round_id","pair","room","voter","name","votes","done"] };
+
+function checkSchema(out){
+  var jobs = Object.keys(NEED).map(function(table){
+    return sb(table + "?select=" + NEED[table].join(",") + "&limit=1")
+      .then(function(){ out.push("  " + table + ": all columns present"); return true; })
+      ["catch"](function(e){
+        var msg = String(e && e.message || e);
+        // PostgREST names the offending column: 'column rounds.room does not exist'
+        var miss = NEED[table].filter(function(c){
+          return new RegExp("\\b" + table + "\\." + c + "\\b").test(msg) ||
+                 new RegExp("column \"?" + c + "\"? does not exist").test(msg);
+        });
+        out.push("  " + table + ": FAILED — " + msg.slice(0, 160));
+        if (miss.length) out.push("    missing: " + miss.join(", "));
+        return false;
+      });
+  });
+  return Promise.all(jobs).then(function(r){
+    var ok = r.every(Boolean);
+    out.push(ok ? "  database is up to date"
+                : "  >> the SQL in settings step 2 has not been run on THIS project <<");
+    out.push("");
+    return ok;
+  });
+}
+
 function selfTest(){
   var out = ["Cold and Sour — connection test", new Date().toISOString(), ""];
+  out.push("Supabase: " + (cfg.url || "(none)"));
   var rungs = [
     ["everything on",     { mime: 1, schema: 1, think: 1 }],
     ["no thinkingConfig", { mime: 1, schema: 1, think: 0 }],
@@ -2456,6 +2497,7 @@ function selfTest(){
     ["plain text out",    { mime: 0, schema: 0, think: 0 }]
   ];
 
+  return checkSchema(out).then(function(){
   return modelList().then(function(list){
     out.push("models this key can use: " + list.length);
     if (!list.length){
@@ -2518,6 +2560,7 @@ function selfTest(){
   })["catch"](function(e){
     out.push("Could not list models: " + (e && e.message || e));
     return out.join("\n");
+  });
   });
 }
 
