@@ -671,31 +671,74 @@ function sb(path, opts){
     });
   });
 }
+/* ------------------------------------------------------------------
+   Everything a group round needs — the join code, the chosen courses,
+   who is at the table — rides inside the jsonb columns the very first
+   schema already had. No migration, nothing to run, nothing to get
+   wrong in a SQL editor. Older rounds, whose dishes column is a bare
+   array, still read.
+   ------------------------------------------------------------------ */
+function packRound(row){
+  return { v: 2, room: row.room || null, state: row.state || "open",
+           sections: row.sections || null, host: row.host_name || "",
+           d: row.dishes || [] };
+}
+function readRound(r){
+  if (!r) return null;
+  var box = r.dishes;
+  var legacy = !box || Array.isArray(box);
+  return {
+    id: r.id, pair: r.pair, place: r.place || "", shot_by: r.shot_by,
+    created_at: r.created_at,
+    dishes:    legacy ? (box || []) : (box.d || []),
+    room:      legacy ? null        : (box.room || null),
+    state:     legacy ? "open"      : (box.state || "open"),
+    sections:  legacy ? null        : (box.sections || null),
+    host_name: legacy ? ""          : (box.host || "")
+  };
+}
+function roundRow(row){
+  return { id: row.id, pair: row.pair, place: row.place || "",
+           dishes: packRound(row), shot_by: row.shot_by };
+}
+
+function packBallot(votes, done){
+  return { v: 2, name: meName(), room: curRoom || null, x: votes || {} };
+}
+function readBallot(b){
+  var box = b.votes, legacy = !box || !box.v;
+  return { round_id: b.round_id, voter: b.voter, done: !!b.done,
+           name: legacy ? (b.name || b.voter) : (box.name || b.voter),
+           votes: legacy ? (box || {}) : (box.x || {}) };
+}
+
 function getRounds(){
   if (DEMO) return Promise.resolve(fake.rounds());
-  return sb("rounds?select=*&order=created_at.desc&limit=12");
+  return sb("rounds?select=*&order=created_at.desc&limit=12")
+    .then(function(rows){ return (rows || []).map(readRound); });
 }
 function getRound(id){
   if (DEMO) return Promise.resolve(fake.round(id));
-  return sb("rounds?select=*&id=eq." + encodeURIComponent(id)).then(function(r){ return r[0] || null; });
+  return sb("rounds?select=*&id=eq." + encodeURIComponent(id))
+    .then(function(r){ return readRound(r[0]); });
 }
 function putRound(row){
   if (DEMO) return Promise.resolve(fake.putRound(row));
-  return sb("rounds", { method:"POST", body: row, headers:{ "Prefer":"return=representation" } });
+  return sb("rounds", { method:"POST", body: roundRow(row),
+                        headers:{ "Prefer":"return=minimal" } });
 }
-function getBallots(roundId, room){
+function getBallots(roundId){
   if (DEMO) return Promise.resolve(fake.ballots(roundId));
-  return sb("ballots?select=*&round_id=eq." + encodeURIComponent(roundId),
-            { as: room || curRoom });
+  return sb("ballots?select=*&round_id=eq." + encodeURIComponent(roundId))
+    .then(function(bs){ return (bs || []).map(readBallot); });
 }
 function putBallot(roundId, votes, done){
   if (DEMO) return Promise.resolve(fake.putBallot(roundId, meId(), votes, done));
   return sb("ballots", {
     method: "POST",
-    as: curRoom,
     headers: { "Prefer": "resolution=merge-duplicates,return=minimal" },
-    body: { round_id: roundId, pair: cfg.pair, room: curRoom, voter: meId(),
-            name: meName(), votes: votes, done: !!done,
+    body: { round_id: roundId, pair: cfg.pair, voter: meId(),
+            votes: packBallot(votes, done), done: !!done,
             updated_at: new Date().toISOString() }
   });
 }
@@ -704,7 +747,7 @@ function dropRound(id, room){
   if (DEMO) return Promise.resolve(fake.drop(id));
   // ballots first: a round with orphaned votes would come back looking half-played,
   // and guests' ballots are only reachable through the room code
-  return sb("ballots?round_id=eq." + encodeURIComponent(id), { method: "DELETE", as: room })
+  return sb("ballots?round_id=eq." + encodeURIComponent(id), { method: "DELETE" })
     .then(function(){ return sb("rounds?id=eq." + encodeURIComponent(id), { method: "DELETE" }); });
 }
 
@@ -1528,13 +1571,11 @@ function cook(files){
       else if (/Failed to fetch|NetworkError|ERR_|load failed/i.test(raw))
         m = "The request never landed. Check the connection and try again.";
       else if (/PGRST204|schema cache/i.test(raw))
-        m = "The column is there, but Supabase's API is serving a stale copy of the " +
-            "schema. In the SQL editor run:  notify pgrst, 'reload schema';  " +
-            "then try again. Re-running the setup SQL does this for you.";
+        m = "Supabase's API is serving a stale copy of the schema. In the SQL editor " +
+            "run:  notify pgrst, 'reload schema';  then try again.";
       else if (/does not exist|42703|PGRST/i.test(raw))
-        m = "Supabase does not have the new columns yet — run the SQL from settings " +
-            "step 2 on the project this phone is pointed at, then try again. " +
-            "The connection test in settings says exactly what is missing.";
+        m = "Supabase has no tables yet — run the SQL from settings step 2 on the " +
+            "project this phone points at. The connection test there shows which.";
       else if (/row-level security|violates/i.test(raw))
         m = "Supabase refused the write. Re-run the SQL from settings step 2 so the " +
             "access rules match this version.";
@@ -1550,52 +1591,52 @@ function cook(files){
    ============================================================ */
 function patchRound(id, fields){
   if (DEMO) return Promise.resolve(fake.patch(id, fields));
+  // the group fields live inside dishes, so an update rewrites that blob
+  var merged = {};
+  ["place","dishes","room","state","sections","host_name"].forEach(function(k){
+    merged[k] = (k in fields) ? fields[k] : round[k];
+  });
+  merged.id = id;
   return sb("rounds?id=eq." + encodeURIComponent(id), {
-    method: "PATCH", as: curRoom, headers: { "Prefer": "return=minimal" }, body: fields
+    method: "PATCH", headers: { "Prefer": "return=minimal" },
+    body: { place: merged.place || "", dishes: packRound(merged) }
   });
 }
-function findRoom(room){
-  if (DEMO) return Promise.resolve(fake.byRoom(room));
-  return sb("rounds?select=*&room=eq." + encodeURIComponent(room), { as: room })
-    .then(function(r){ return r[0] || null; });
+
+/* A guest holds the host's pair code, so the round is found by id. */
+function findRound(rid){
+  if (DEMO) return Promise.resolve(fake.round(rid));
+  return getRound(rid);
 }
 
 /* The QR carries the keys, because a guest's phone has none of its own. It is
    scoped to this one round: the code it holds opens that round and nothing else. */
 var JWT_HEAD = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.";
 
-/* Every character here costs symbol size, and symbol size costs scannability:
-   the old base64 blob needed a 65x65 code, which at thumbnail size leaves two
-   pixels per module. Sending the project ref instead of the whole URL, and
-   dropping the JWT header every Supabase key shares, gets it to 53x53. */
+/* A guest needs the project, the key, the pair code that row security checks,
+   and which round to sit at. Sending the project ref rather than the whole URL,
+   and dropping the JWT header every Supabase key begins with, keeps the symbol
+   small enough to scan from across a table. */
 function joinLink(row){
   var m = /^https:\/\/([a-z0-9-]+)\.supabase\.co$/i.exec(cfg.url || "");
   var ref = m ? m[1] : "!" + cfg.url;
   var key = (cfg.key || "").indexOf(JWT_HEAD) === 0 ? cfg.key.slice(JWT_HEAD.length) : "!" + cfg.key;
-  return location.href.split("#")[0].split("?")[0] + "#j=" +
-         ref + "~" + row.room + "~" + key;
+  return location.href.split("#")[0].split("?")[0] + "#g=" +
+         ref + "~" + cfg.pair + "~" + row.id + "~" + key;
 }
 
 function readJoin(frag){
-  var m = /[#&]j=([^&]+)/.exec(frag || "");
-  if (!m) return null;
-  var raw = m[1];
-  if (raw.indexOf("~") > 0){
-    var bits = raw.split("~");
-    if (bits.length < 3) return null;
-    var ref = bits[0], room = bits[1], key = bits.slice(2).join("~");
+  var m = /[#&]g=([^&]+)/.exec(frag || "");
+  if (m){
+    var b = m[1].split("~");
+    if (b.length < 4) return null;
+    var ref = b[0], key = b.slice(3).join("~");
     return {
       u: ref.charAt(0) === "!" ? ref.slice(1) : "https://" + ref + ".supabase.co",
       k: key.charAt(0) === "!" ? key.slice(1) : JWT_HEAD + key,
-      r: room
+      p: b[1], rid: b[2]
     };
   }
-  try {                                   // links handed out before the short form
-    var t = raw.replace(/-/g, "+").replace(/_/g, "/");
-    while (t.length % 4) t += "=";
-    var o = JSON.parse(decodeURIComponent(escape(atob(t))));
-    if (o && o.u && o.k && o.r) return o;
-  } catch(e){}
   return null;
 }
 
@@ -1707,7 +1748,7 @@ function pollLobby(){
   function tick(){
     Promise.all([
       getBallots(round.id),
-      isGuest() ? findRoom(round.room) : Promise.resolve(null)
+      isGuest() ? findRound(round.id) : Promise.resolve(null)
     ]).then(function(r){
       crowd = crowdOf(r[0], (round.dishes || []).length);
       renderCrowd($("lobbyWho"));
@@ -1741,35 +1782,34 @@ var pendingJoin = null;
 
 function askToJoin(o){
   pendingJoin = o;
-  $("joinCode").textContent = o.r;
+  $("joinCode").textContent = "table " + String(o.rid || "").toUpperCase();
   $("joinErr").textContent = "";
-  try { $("joinName").value = (loadCfg() && loadCfg().guest && loadCfg().guest.name) || ""; } catch(e){}
+  var had = loadCfg();
+  $("joinName").value = (had && had.guest && had.guest.name) || "";
   show("join");
 }
 
 $("joinGo").addEventListener("click", function(){
   var nm = ($("joinName").value || "").trim();
-  if (!nm) { $("joinErr").textContent = "A name, so the others know who matched."; return; }
+  if (!nm){ $("joinErr").textContent = "A name, so the others know who matched."; return; }
   var o = pendingJoin;
   if (!o) return;
-  var id = "g" + rndId(6);
-  var old = loadCfg();
-  if (old && old.guest && old.guest.id) id = old.guest.id;     // same phone, same person
-  saveCfg({ url: o.u, key: o.k, gkey: (old && old.gkey) || "", pair: o.r,
-            names: null, me: null, guest: { id: id, name: nm } });
-  curRoom = o.r;
+  var had = loadCfg();
+  var id = (had && had.guest && had.guest.id) || ("g" + rndId(6));
+  saveCfg({ url: o.u, key: o.k, gkey: (had && had.gkey) || "", pair: o.p,
+            names: null, me: null, guest: { id: id, name: nm, rid: o.rid } });
   $("joinGo").disabled = true;
-  findRoom(o.r).then(function(row){
+  findRound(o.rid).then(function(row){
     $("joinGo").disabled = false;
     if (!row){ $("joinErr").textContent = "That table is gone."; return; }
     round = row; curRoom = row.room;
     return putBallot(row.id, {}, false).then(function(){
-      if (row.state === "open") return startDeck(row);
+      if (row.state === "open"){ order = activeOrder(); return startDeck(row); }
       openLobby(row);
     });
-  })["catch"](function(){
+  })["catch"](function(e){
     $("joinGo").disabled = false;
-    $("joinErr").textContent = "Could not reach the table. Check the connection.";
+    $("joinErr").textContent = String(e && e.message || e).slice(0, 120);
   });
 });
 
@@ -2102,7 +2142,7 @@ function pollHome(){
       // ballots live under each round's room code, so they are fetched per round
       var live = rows.slice(0, 3);
       return Promise.all(live.map(function(r){
-        return getBallots(r.id, r.room)["catch"](function(){ return []; });
+        return getBallots(r.id)["catch"](function(){ return []; });
       })).then(function(lists){
         var bs = [];
         lists.forEach(function(l){ bs = bs.concat(l); });
@@ -2224,7 +2264,7 @@ function openRound(id){
   getRound(id).then(function(row){
     if (!row) return toast("That round is gone.");
     curRoom = row.room || null;
-    return getBallots(id, row.room).then(function(bs){
+    return getBallots(id).then(function(bs){
       var mine = null, rest = [];
       bs.forEach(function(b){
         if (b.voter === meId()) mine = b; else rest.push(b);
@@ -2471,8 +2511,8 @@ function probe(model, cfgName, gen){
 /* The schema moved when rounds became rooms, and "re-run the SQL" is a useless
    thing to tell someone who believes they already did. Ask the database which
    columns it actually has and name the missing ones. */
-var NEED = { rounds: ["id","pair","room","place","dishes","sections","state","shot_by","host_name","created_at"],
-             ballots: ["round_id","pair","room","voter","name","votes","done"] };
+var NEED = { rounds:  ["id","pair","place","dishes","shot_by","created_at"],
+             ballots: ["round_id","pair","voter","votes","done","updated_at"] };
 
 function checkSchema(out){
   var jobs = Object.keys(NEED).map(function(table){
@@ -2625,15 +2665,14 @@ function boot(){
 
   // a guest reopening the app goes back to the table they were at
   if (cfg && isGuest()){
-    curRoom = cfg.pair;
-    findRoom(cfg.pair).then(function(row){
-      if (!row) return askToJoin({ u: cfg.url, k: cfg.key, r: cfg.pair });
+    var back = { u: cfg.url, k: cfg.key, p: cfg.pair, rid: cfg.guest.rid };
+    if (!back.rid) { askToJoin(back); return; }
+    findRound(back.rid).then(function(row){
+      if (!row) return askToJoin(back);
       round = row; curRoom = row.room;
       order = activeOrder();
       if (row.state === "open") startDeck(row); else openLobby(row);
-    })["catch"](function(){
-      askToJoin({ u: cfg.url, k: cfg.key, r: cfg.pair });
-    });
+    })["catch"](function(){ askToJoin(back); });
     return;
   }
 
