@@ -60,3 +60,9 @@ create policy "pair or room" on public.ballots
            or room = current_setting('request.headers', true)::json ->> 'x-pair')
   with check (pair = current_setting('request.headers', true)::json ->> 'x-pair'
            or room = current_setting('request.headers', true)::json ->> 'x-pair');
+
+-- PostgREST serves the API from a cached copy of the schema, and adding columns
+-- does not always make it look again — the API then answers PGRST204, "could not
+-- find the 'state' column", about a column that plainly exists. This tells it to
+-- read the schema afresh, and is why this file is safe and useful to re-run.
+notify pgrst, 'reload schema';

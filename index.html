@@ -1515,7 +1515,11 @@ function cook(files){
         m = "Gemini refused to answer on that image. Try a straighter, closer shot.";
       else if (/Failed to fetch|NetworkError|ERR_|load failed/i.test(raw))
         m = "The request never landed. Check the connection and try again.";
-      else if (/does not exist|PGRST|schema cache/i.test(raw))
+      else if (/PGRST204|schema cache/i.test(raw))
+        m = "The column is there, but Supabase's API is serving a stale copy of the " +
+            "schema. In the SQL editor run:  notify pgrst, 'reload schema';  " +
+            "then try again. Re-running the setup SQL does this for you.";
+      else if (/does not exist|42703|PGRST/i.test(raw))
         m = "Supabase does not have the new columns yet — run the SQL from settings " +
             "step 2 on the project this phone is pointed at, then try again. " +
             "The connection test in settings says exactly what is missing.";
@@ -2471,17 +2475,21 @@ function checkSchema(out){
         // PostgREST names the offending column: 'column rounds.room does not exist'
         var miss = NEED[table].filter(function(c){
           return new RegExp("\\b" + table + "\\." + c + "\\b").test(msg) ||
+                 new RegExp("'" + c + "'").test(msg) ||
                  new RegExp("column \"?" + c + "\"? does not exist").test(msg);
         });
         out.push("  " + table + ": FAILED — " + msg.slice(0, 160));
-        if (miss.length) out.push("    missing: " + miss.join(", "));
+        if (miss.length) out.push("    column(s): " + miss.join(", "));
+        if (/PGRST204|schema cache/i.test(msg))
+          out.push("    >> stale API cache, not a missing column.",
+                   "    >> run:  notify pgrst, 'reload schema';");
         return false;
       });
   });
   return Promise.all(jobs).then(function(r){
     var ok = r.every(Boolean);
     out.push(ok ? "  database is up to date"
-                : "  >> the SQL in settings step 2 has not been run on THIS project <<");
+                : "  >> fix the line(s) above, then run this test again <<");
     out.push("");
     return ok;
   });
