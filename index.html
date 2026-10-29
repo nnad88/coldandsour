@@ -175,6 +175,9 @@ input,textarea{font-family:inherit;font-size:16px}
 #lobbyFootArea .step{text-align:center;padding-bottom:8px}
 #lobbyFootArea .bar{margin:0 auto 8px;max-width:300px}
 #lobbyFootArea .pct{text-align:center;padding-bottom:10px}
+#lobbyFootArea .go{margin:2px auto 0;width:124px;height:124px;font-size:38px}
+#lobbyFootArea .goNote{text-align:center;padding-top:9px;font-family:var(--mono);
+  font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.72)}
 
 /* ---------- cooking ---------- */
 .cook{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
@@ -251,6 +254,7 @@ input,textarea{font-family:inherit;font-size:16px}
 body.is-guest #gearBtn,
 body.is-guest #pickBtn,
 body.is-guest #lobbyQuit,
+
 body.is-guest #lobbyCats,
 body.is-guest #lobbyGo,
 body.is-guest #lobbyBarWrap,
@@ -430,6 +434,8 @@ body.is-guest #lobbyPct{display:none !important}
 
     <div class="who-list" id="lobbyWho"></div>
 
+    <button class="link hide" id="lobbyLeave">Leave this table</button>
+
     <div class="cats hide" id="lobbyCats">
       <p class="catLede">What are we choosing between?</p>
       <div id="catList"></div>
@@ -440,7 +446,8 @@ body.is-guest #lobbyPct{display:none !important}
     <div class="step" id="lobbyState">Reading the menu…</div>
     <div class="bar hide" id="lobbyBarWrap"><i id="lobbyBar"></i></div>
     <div class="pct hide" id="lobbyPct">0%</div>
-    <button class="big hide" id="lobbyGo">Start swiping</button>
+    <button class="go hide" id="lobbyGo">GO</button>
+    <div class="goNote hide" id="lobbyGoNote">—</div>
   </div>
 </section>
 
@@ -507,7 +514,7 @@ body.is-guest #lobbyPct{display:none !important}
     <div class="bar"><i id="waitBar"></i></div>
     <div class="pct" id="waitPct">—</div>
     <div style="height:26px"></div>
-    <button class="ghost" id="waitPeek" style="max-width:300px">See what we have so far</button>
+    <button class="ghost" id="waitPeek" style="max-width:300px">Show the matches now</button>
     <div style="height:8px"></div>
     <button class="link" id="waitBack">Back to the start</button>
   </div>
@@ -582,24 +589,56 @@ var cfg = null;
 // try the swiping before setting anything up. The other person votes at random.
 var DEMO = /[?&]demo=/.test(location.search);
 
+var JOIN_KEY = "cas.join";
+
+/* Two separate things, kept in two separate places, because conflating them is
+   what trapped a host inside someone else's table with no way back:
+     host  — this phone's own setup: keys, pair code, the two names. Joining a
+             table never touches it.
+     sess  — a guest session: which round, who I am there. Clearing it returns
+             the phone to being itself.
+   cfg is simply whichever of the two is driving the database right now. */
+var host = null, sess = null;
+
 function loadCfg(){
   try { var v = JSON.parse(localStorage.getItem(CFG_KEY) || "null");
         return (v && v.url && v.key && v.pair) ? v : null; }
   catch(e){ return null; }
 }
-function saveCfg(c){ try { localStorage.setItem(CFG_KEY, JSON.stringify(c)); } catch(e){} cfg = c; }
-/* Identity used to be "one of two phones". A round can now hold any number of
-   people, so everyone — host or guest — is just an id with a name against it.
-   The old two-phone config still resolves, so nothing on your phones breaks. */
+function saveCfg(c){ try { localStorage.setItem(CFG_KEY, JSON.stringify(c)); } catch(e){} host = c; useHost(); }
+
+function loadSess(){
+  try { var v = JSON.parse(localStorage.getItem(JOIN_KEY) || "null");
+        return (v && v.url && v.key && v.pair && v.id) ? v : null; }
+  catch(e){ return null; }
+}
+function saveSess(v){
+  try { localStorage.setItem(JOIN_KEY, JSON.stringify(v)); } catch(e){}
+  sess = v; useSess();
+}
+function endSess(){
+  try { localStorage.removeItem(JOIN_KEY); } catch(e){}
+  sess = null;
+  if (host) useHost();
+}
+
+function useHost(){ sess = null; cfg = host; }
+function useSess(){
+  cfg = { url: sess.url, key: sess.key, pair: sess.pair,
+          gkey: (host && host.gkey) || "" };
+}
+
+function isGuest(){ return !!sess; }
+function hasOwnApp(){ return !!host; }
+
 function meId(){
-  if (cfg.guest && cfg.guest.id) return cfg.guest.id;
-  return "p" + cfg.me;
+  if (sess) return sess.id;
+  return "p" + (host ? host.me : 0);
 }
 function meName(){
-  if (cfg.guest && cfg.guest.name) return cfg.guest.name;
-  return (cfg.names && cfg.names[cfg.me]) || "you";
+  if (sess) return sess.name;
+  return (host && host.names && host.names[host.me]) || "you";
 }
-function isGuest(){ return !!(cfg.guest && cfg.guest.id); }
 
 /* The room code a round is joined by. Guests hold it instead of a pair code and
    send it as the same header, so row security lets them at that one round. */
@@ -855,11 +894,20 @@ var DEMO_DISHES = [
 var MODEL_KEY = "cas.model";
 var DEFAULT_MODEL = "gemini-3.8-flash";
 
+/* A model that worked this morning may be out of quota tonight, so what is kept
+   is a hint with a shelf life rather than a choice made once and lived with.
+   Past that, the catalogue is consulted again and the ranking decides. */
+var MODEL_TTL = 3 * 60 * 60 * 1000;
 function savedModel(){
-  try { return localStorage.getItem(MODEL_KEY) || ""; } catch(e){ return ""; }
+  try {
+    var v = JSON.parse(localStorage.getItem(MODEL_KEY) || "null");
+    if (typeof v === "string") return v;                 // written by an older build
+    if (v && v.m && (Date.now() - (v.at || 0)) < MODEL_TTL) return v.m;
+  } catch(e){}
+  return "";
 }
 function rememberModel(m){
-  try { localStorage.setItem(MODEL_KEY, m); } catch(e){}
+  try { localStorage.setItem(MODEL_KEY, JSON.stringify({ m: m, at: Date.now() })); } catch(e){}
 }
 function forgetModel(){
   modelCache = null;
@@ -1773,6 +1821,8 @@ function openLobby(row){
   $("lobbyCode").textContent = row.room || "—";
   $("lobbyCats").classList.add("hide");
   $("lobbyGo").classList.add("hide");
+  $("lobbyGoNote").classList.add("hide");
+  $("lobbyLeave").classList.toggle("hide", !(isGuest() && hasOwnApp()));
   $("lobLede").textContent = isGuest()
     ? "You're in. Waiting for the menu."
     : "Anyone at the table can scan this and swipe with you.";
@@ -1817,11 +1867,14 @@ function lobbyReady(){
   });
   $("lobbyCats").classList.remove("hide");
 
-  var picked = chosenSections();
-  var n = countIn(picked);
-  $("lobbyGo").textContent = n ? "Start swiping · " + n + " dishes" : "Pick at least one course";
+  var n = countIn(chosenSections());
   $("lobbyGo").disabled = !n;
+  $("lobbyGo").style.opacity = n ? "1" : ".45";
   $("lobbyGo").classList.remove("hide");
+  $("lobbyGoNote").textContent = n ? n + " dishes · " + crowd.length +
+                                     (crowd.length === 1 ? " here" : " here")
+                                   : "pick at least one course";
+  $("lobbyGoNote").classList.remove("hide");
   $("lobbyState").textContent = "";
 }
 
@@ -1881,6 +1934,15 @@ function pollLobby(){
 }
 
 $("lobbyQuit").addEventListener("click", function(){ show("home"); });
+$("lobbyLeave").addEventListener("click", function(){
+  // a phone with its own setup is never stuck inside somebody else's table.
+  // The invite has to come out of the address bar too, or boot offers it again.
+  endSess();
+  round = null; curRoom = null; crowd = [];
+  try { history.replaceState(null, "", location.pathname + location.search); } catch(e){}
+  toast("Back to your own app");
+  boot();
+});
 $("lobbyGo").addEventListener("click", function(){
   var secs = chosenSections();
   if (!secs.length) return;
@@ -1907,24 +1969,30 @@ $("joinGo").addEventListener("click", function(){
   if (!nm){ $("joinErr").textContent = "A name, so the others know who matched."; return; }
   var o = pendingJoin;
   if (!o) return;
-  var had = loadCfg();
-  var id = (had && had.guest && had.guest.id) || ("g" + rndId(6));
-  saveCfg({ url: o.u, key: o.k, gkey: (had && had.gkey) || "", pair: o.p,
-            names: null, me: null, guest: { id: id, name: nm, rid: o.rid } });
+  var old = loadSess();
+  var id = (old && old.pair === o.p && old.id) || ("g" + rndId(6));
+  saveSess({ url: o.u, key: o.k, pair: o.p, rid: o.rid, id: id, name: nm });
   $("joinGo").disabled = true;
   findRound(o.rid).then(function(row){
     $("joinGo").disabled = false;
     if (!row){ $("joinErr").textContent = "That table is gone."; return; }
-    round = row; curRoom = row.room;
-    return putBallot(row.id, {}, false).then(function(){
-      if (row.state === "open"){ order = activeOrder(); return startDeck(row); }
-      openLobby(row);
-    });
+    enterRound(row);
   })["catch"](function(e){
     $("joinGo").disabled = false;
     $("joinErr").textContent = String(e && e.message || e).slice(0, 120);
   });
 });
+
+/* One door into a round, so host and guest cannot end up in different states. */
+function enterRound(row){
+  round = row; curRoom = row.room;
+  order = activeOrder();
+  return putBallot(row.id, {}, false)["catch"](function(){})
+    .then(function(){
+      if (row.state === "open" && order.length) return startDeck(row);
+      openLobby(row);
+    });
+}
 
 /* ============================================================
    GO
@@ -2163,7 +2231,13 @@ function pollWait(){
         : rest.length === 1
           ? (rest[0].done ? rest[0].name + " has finished too" : rest[0].name + " is on " + rest[0].n + " of " + total)
           : rest.map(function(c){ return c.name + (c.done ? " ✓" : " " + c.n); }).join(" · ");
-      if (rest.length && done === rest.length){ stopPolls(); openResults(false); }
+      // Waiting on everyone is how a round hangs: a phone that joined and never
+      // swiped, or a duplicate identity, would hold the table for ever. Only
+      // people who actually started are waited for.
+      var active = rest.filter(function(c){ return c.n > 0 || c.done; });
+      if (active.length && active.every(function(c){ return c.done; })){
+        stopPolls(); openResults(false);
+      }
     })["catch"](function(){ $("waitStep").textContent = "Offline… retrying"; });
   }
   tick();
@@ -2197,11 +2271,16 @@ function openResults(partial){
   });
 
   function render(){
-    var people = crowd.length || 1;
+    // Somebody who joined and never swiped is at the table but not in the vote.
+    // Counting them makes unanimity impossible and every result read as a failure.
+    var voters = crowd.filter(function(c){ return c.n > 0; });
+    if (!voters.length) voters = crowd;
+    var people = voters.length || 1;
+    var idle = crowd.length - voters.length;
     var rows = [];
     order.forEach(function(di){
       var yes = [], no = [];
-      crowd.forEach(function(c){
+      voters.forEach(function(c){
         if (c.votes[String(di)] === 1) yes.push(c.name);
         else if (c.votes[String(di)] === 0) no.push(c.name);
       });
@@ -2215,9 +2294,12 @@ function openResults(partial){
 
     $("resPill").textContent = round.place ? round.place.slice(0, 18) : (round.room || round.id);
     $("resN").textContent = all.length;
-    $("resH").textContent = all.length === 1 ? "everyone wants it" : "everyone wants them";
+    $("resH").textContent = !all.length ? "agreed on"
+                          : all.length === 1 ? "everyone wants it"
+                          : "everyone wants them";
     $("resP").textContent = all.length
-      ? people + " at the table, " + all.length + " agreed."
+      ? people + (people === 1 ? " voted, " : " voted, ") + all.length + " agreed." +
+        (idle ? " (" + idle + " never swiped)" : "")
       : NONE[Math.floor(Math.random() * NONE.length)];
 
     var h = "";
@@ -2758,10 +2840,15 @@ $("diagCopy").addEventListener("click", function(){ copy(diagText, "Report copie
    boot
    ============================================================ */
 function boot(){
-  cfg = loadCfg();
+  // load both halves before anything decides which of them is driving
+  host = loadCfg();
+  sess = loadSess();
+  if (sess) useSess(); else cfg = host;
 
   if (DEMO){
-    cfg = { url:"", key:"", gkey:"", pair:"demo", names:["Dani","Ana"], me:0 };
+    sess = null;
+    host = { url:"", key:"", gkey:"", pair:"demo", names:["Dani","Ana"], me:0 };
+    cfg = host;
     show("home");
     return;
   }
@@ -2778,37 +2865,47 @@ function boot(){
   var invite = readJoin(location.hash);
   if (invite){
     if (standalone) history.replaceState(null, "", location.pathname + location.search);
+    // Scanning your own QR used to make you a guest at your own table, under a
+    // second identity — so the round waited for a person who was already there.
+    if (host && host.pair === invite.p){
+      endSess();
+      return findRound(invite.rid).then(function(row){
+        if (!row) return show("home");
+        round = row; curRoom = row.room; order = activeOrder();
+        if (row.state === "reading" || row.state === "choosing") return openLobby(row);
+        return enterRound(row);
+      })["catch"](function(){ show("home"); });
+    }
     askToJoin(invite);
     return;
   }
 
   // a guest reopening the app goes back to the table they were at
-  if (cfg && isGuest()){
-    var back = { u: cfg.url, k: cfg.key, p: cfg.pair, rid: cfg.guest.rid };
-    if (!back.rid) { askToJoin(back); return; }
+  if (sess){
+    var back = { u: sess.url, k: sess.key, p: sess.pair, rid: sess.rid };
+    if (!back.rid){ askToJoin(back); return; }
     findRound(back.rid).then(function(row){
-      if (!row) return askToJoin(back);
-      round = row; curRoom = row.room;
-      order = activeOrder();
-      if (row.state === "open") startDeck(row); else openLobby(row);
+      if (!row){ toast("That table has gone."); endSess(); return boot(); }
+      round = row; curRoom = row.room; order = activeOrder();
+      if (row.state === "open" && order.length) startDeck(row); else openLobby(row);
     })["catch"](function(){ askToJoin(back); });
     return;
   }
 
   var incoming = readPair(location.hash);
   // opening the other person's link on this phone also corrects who it thinks it is
-  if (incoming && (!cfg || cfg.pair !== incoming.p ||
-                   (typeof incoming.m === "number" && cfg.me !== incoming.m))){
+  if (incoming && (!host || host.pair !== incoming.p ||
+                   (typeof incoming.m === "number" && host.me !== incoming.m))){
     if (standalone) history.replaceState(null, "", location.pathname + location.search);
     adoptPair(incoming, !standalone);
     return;
   }
   if (location.hash && standalone) history.replaceState(null, "", location.pathname + location.search);
 
-  if (!cfg || cfg.me === null || cfg.me === undefined){
-    if (cfg){ // paired but nobody said who
-      $("sbUrl").value = cfg.url; $("sbKey").value = cfg.key; $("gKey").value = cfg.gkey || "";
-      $("nmA").value = cfg.names[0]; $("nmB").value = cfg.names[1];
+  if (!host || host.me === null || host.me === undefined){
+    if (host){ // paired but nobody said who
+      $("sbUrl").value = host.url; $("sbKey").value = host.key; $("gKey").value = host.gkey || "";
+      $("nmA").value = (host.names || [])[0] || ""; $("nmB").value = (host.names || [])[1] || "";
       refreshWhoLabels();
     }
     show("setup");
@@ -2822,6 +2919,11 @@ function boot(){
 window.addEventListener("hashchange", function(){
   if (readPair(location.hash) || readJoin(location.hash)) boot();
 });
+
+// a free, quota-less call: knowing what this key can reach before it is needed
+if (!DEMO) setTimeout(function(){
+  try { if (cfg && cfg.gkey) modelList(); } catch(e){}
+}, 1500);
 
 if ("serviceWorker" in navigator){
   window.addEventListener("load", function(){
